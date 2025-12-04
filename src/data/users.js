@@ -1,48 +1,19 @@
-/**
- * Users/Students data for the Library Book Allotment System
- * 
- * Degrees: BTECH, MTECH, MCA
- * Years: FINAL, PRE_FINAL
- * 
- * Priority Order (for allocation):
- * 1. MTECH FINAL
- * 2. MTECH PRE_FINAL
- * 3. BTECH FINAL
- * 4. MCA FINAL
- * 5. BTECH PRE_FINAL
- * 6. MCA PRE_FINAL
- * 
- * To replace with API later:
- * export const fetchUsers = async () => await fetch('/api/users').then(r => r.json());
- */
-
 export const USERS = [
-  // MTECH FINAL
-  { id: "MT001", name: "Arun Kumar", degree: "MTECH", year: "FINAL", cpi: 9.2, preferences: ["B001", "B009", "B011", "B024", "B003"] },
-  { id: "MT002", name: "Priya Sharma", degree: "MTECH", year: "FINAL", cpi: 8.8, preferences: ["B009", "B010", "B011", "B001", "B008"] },
-  { id: "MT003", name: "Rahul Verma", degree: "MTECH", year: "FINAL", cpi: 8.8, preferences: ["B001", "B003", "B002", "B014", "B024"] },
-  
-  // MTECH PRE_FINAL
-  { id: "MT004", name: "Sneha Patel", degree: "MTECH", year: "PRE_FINAL", cpi: 9.0, preferences: ["B010", "B011", "B009", "B017", "B018"] },
-  { id: "MT005", name: "Vikram Singh", degree: "MTECH", year: "PRE_FINAL", cpi: 8.5, preferences: ["B001", "B015", "B013", "B012", "B006"] },
-  
-  // BTECH FINAL
-  { id: "BT001", name: "Ananya Reddy", degree: "BTECH", year: "FINAL", cpi: 9.5, preferences: ["B002", "B003", "B004", "B025", "B023"] },
-  { id: "BT002", name: "Karthik Nair", degree: "BTECH", year: "FINAL", cpi: 8.9, preferences: ["B001", "B002", "B025", "B024", "B015"] },
-  { id: "BT003", name: "Meera Joshi", degree: "BTECH", year: "FINAL", cpi: 8.7, preferences: ["B021", "B022", "B023", "B002", "B004"] },
-  { id: "BT004", name: "Arjun Menon", degree: "BTECH", year: "FINAL", cpi: 8.2, preferences: ["B025", "B024", "B001", "B002", "B003"] },
-  
-  // MCA FINAL
-  { id: "MC001", name: "Divya Krishnan", degree: "MCA", year: "FINAL", cpi: 9.1, preferences: ["B008", "B014", "B021", "B022", "B007"] },
-  { id: "MC002", name: "Sanjay Gupta", degree: "MCA", year: "FINAL", cpi: 8.6, preferences: ["B022", "B023", "B021", "B002", "B004"] },
-  
-  // BTECH PRE_FINAL
-  { id: "BT005", name: "Neha Agarwal", degree: "BTECH", year: "PRE_FINAL", cpi: 9.3, preferences: ["B015", "B016", "B001", "B005", "B017"] },
-  { id: "BT006", name: "Rohan Desai", degree: "BTECH", year: "PRE_FINAL", cpi: 8.4, preferences: ["B006", "B007", "B019", "B012", "B013"] },
-  { id: "BT007", name: "Ishita Bansal", degree: "BTECH", year: "PRE_FINAL", cpi: 7.9, preferences: ["B020", "B021", "B023", "B022", "B002"] },
-  
-  // MCA PRE_FINAL
-  { id: "MC003", name: "Amit Saxena", degree: "MCA", year: "PRE_FINAL", cpi: 8.8, preferences: ["B014", "B008", "B007", "B006", "B021"] },
-  { id: "MC004", name: "Pooja Iyer", degree: "MCA", year: "PRE_FINAL", cpi: 8.1, preferences: ["B018", "B017", "B016", "B005", "B015"] },
-  { id: "MC005", name: "Suresh Rajan", degree: "MCA", year: "PRE_FINAL", cpi: 7.5, preferences: ["B019", "B006", "B007", "B012", "B013"] },
+    { id: "MT001", name: "Arun Kumar", degree: "MTECH", year: "FINAL", cpi: 9.2, preferences: ["B001", "B009", "B011", "B024", "B003"] },
+    { id: "MT002", name: "Priya Sharma", degree: "MTECH", year: "FINAL", cpi: 8.8, preferences: ["B009", "B010", "B011", "B001", "B008"] },
+    { id: "MT003", name: "Rahul Verma", degree: "MTECH", year: "FINAL", cpi: 8.8, preferences: ["B001", "B003", "B002", "B014", "B024"] },
+    { id: "MT004", name: "Sneha Patel", degree: "MTECH", year: "PRE_FINAL", cpi: 9.0, preferences: ["B010", "B011", "B009", "B017", "B018"] },
+    { id: "MT005", name: "Vikram Singh", degree: "MTECH", year: "PRE_FINAL", cpi: 8.5, preferences: ["B001", "B015", "B013", "B012", "B006"] },
+    { id: "BT001", name: "Ananya Reddy", degree: "BTECH", year: "FINAL", cpi: 9.5, preferences: ["B002", "B003", "B004", "B025", "B023"] },
+    { id: "BT002", name: "Karthik Nair", degree: "BTECH", year: "FINAL", cpi: 8.9, preferences: ["B001", "B002", "B025", "B024", "B015"] },
+    { id: "BT003", name: "Meera Joshi", degree: "BTECH", year: "FINAL", cpi: 8.7, preferences: ["B021", "B022", "B023", "B002", "B004"] },
+    { id: "BT004", name: "Arjun Menon", degree: "BTECH", year: "FINAL", cpi: 8.2, preferences: ["B025", "B024", "B001", "B002", "B003"] },
+    { id: "MC001", name: "Divya Krishnan", degree: "MCA", year: "FINAL", cpi: 9.1, preferences: ["B008", "B014", "B021", "B022", "B007"] },
+    { id: "MC002", name: "Sanjay Gupta", degree: "MCA", year: "FINAL", cpi: 8.6, preferences: ["B022", "B023", "B021", "B002", "B004"] },
+    { id: "BT005", name: "Neha Agarwal", degree: "BTECH", year: "PRE_FINAL", cpi: 9.3, preferences: ["B015", "B016", "B001", "B005", "B017"] },
+    { id: "BT006", name: "Rohan Desai", degree: "BTECH", year: "PRE_FINAL", cpi: 8.4, preferences: ["B006", "B007", "B019", "B012", "B013"] },
+    { id: "BT007", name: "Ishita Bansal", degree: "BTECH", year: "PRE_FINAL", cpi: 7.9, preferences: ["B020", "B021", "B023", "B022", "B002"] },
+    { id: "MC003", name: "Amit Saxena", degree: "MCA", year: "PRE_FINAL", cpi: 8.8, preferences: ["B014", "B008", "B007", "B006", "B021"] },
+    { id: "MC004", name: "Pooja Iyer", degree: "MCA", year: "PRE_FINAL", cpi: 8.1, preferences: ["B018", "B017", "B016", "B005", "B015"] },
+    { id: "MC005", name: "Suresh Rajan", degree: "MCA", year: "PRE_FINAL", cpi: 7.5, preferences: ["B019", "B006", "B007", "B012", "B013"] },
 ];
