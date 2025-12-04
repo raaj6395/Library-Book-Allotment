@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Library Theme - Warm, Cozy, Bookish */
+    --background: 40 33% 96%;
+    --foreground: 25 30% 15%;
+
+    --card: 40 40% 98%;
+    --card-foreground: 25 30% 15%;
+
+    --popover: 40 40% 98%;
+    --popover-foreground: 25 30% 15%;
+
+    --primary: 25 60% 30%;
+    --primary-foreground: 40 40% 98%;
+
+    --secondary: 40 25% 88%;
+    --secondary-foreground: 25 30% 20%;
+
+    --muted: 40 20% 90%;
+    --muted-foreground: 25 15% 45%;
+
+    --accent: 145 35% 35%;
+    --accent-foreground: 40 40% 98%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 40 40% 98%;
+
+    --border: 35 25% 82%;
+    --input: 35 25% 85%;
+    --ring: 25 60% 30%;
+
+    --radius: 0.5rem;
+
+    /* Custom Library Colors */
+    --wood: 25 45% 25%;
+    --wood-light: 30 35% 45%;
+    --parchment: 45 45% 94%;
+    --leather: 15 55% 22%;
+    --gold: 45 80% 50%;
+    --forest: 145 35% 35%;
+
+    --sidebar-background: 25 30% 12%;
+    --sidebar-foreground: 40 30% 90%;
+    --sidebar-primary: 45 80% 50%;
+    --sidebar-primary-foreground: 25 30% 12%;
+    --sidebar-accent: 25 35% 20%;
+    --sidebar-accent-foreground: 40 30% 90%;
+    --sidebar-border: 25 25% 20%;
+    --sidebar-ring: 45 80% 50%;
+  }
+
+  .dark {
+    --background: 25 30% 8%;
+    --foreground: 40 30% 92%;
+
+    --card: 25 28% 12%;
+    --card-foreground: 40 30% 92%;
+
+    --popover: 25 28% 12%;
+    --popover-foreground: 40 30% 92%;
+
+    --primary: 45 75% 55%;
+    --primary-foreground: 25 30% 10%;
+
+    --secondary: 25 25% 18%;
+    --secondary-foreground: 40 30% 88%;
+
+    --muted: 25 20% 18%;
+    --muted-foreground: 40 15% 60%;
+
+    --accent: 145 40% 45%;
+    --accent-foreground: 25 30% 10%;
+
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 40 40% 98%;
+
+    --border: 25 20% 22%;
+    --input: 25 20% 22%;
+    --ring: 45 75% 55%;
+
+    --wood: 30 40% 55%;
+    --wood-light: 35 35% 65%;
+    --parchment: 40 20% 15%;
+    --leather: 20 45% 35%;
+    --gold: 45 85% 55%;
+    --forest: 145 40% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .shelf-shadow {
+    box-shadow: 
+      0 4px 6px -1px hsl(var(--wood) / 0.15),
+      0 2px 4px -2px hsl(var(--wood) / 0.1),
+      inset 0 -2px 0 0 hsl(var(--wood) / 0.1);
+  }
+
+  .book-spine {
+    box-shadow: 
+      inset 3px 0 8px -2px hsl(var(--wood) / 0.2),
+      inset -1px 0 4px -2px hsl(var(--wood) / 0.1);
+  }
+}

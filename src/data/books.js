@@ -1,0 +1,35 @@
+/**
+ * Books data for the Library Book Allotment System
+ * Each book has: id, name, author
+ * 
+ * To replace with API later:
+ * export const fetchBooks = async () => await fetch('/api/books').then(r => r.json());
+ */
+
+export const BOOKS = [
+  { id: "B001", name: "Introduction to Algorithms", author: "Thomas H. Cormen" },
+  { id: "B002", name: "Clean Code", author: "Robert C. Martin" },
+  { id: "B003", name: "Design Patterns", author: "Gang of Four" },
+  { id: "B004", name: "The Pragmatic Programmer", author: "David Thomas" },
+  { id: "B005", name: "Structure and Interpretation", author: "Harold Abelson" },
+  { id: "B006", name: "Computer Networks", author: "Andrew S. Tanenbaum" },
+  { id: "B007", name: "Operating Systems Concepts", author: "Abraham Silberschatz" },
+  { id: "B008", name: "Database System Concepts", author: "Abraham Silberschatz" },
+  { id: "B009", name: "Artificial Intelligence", author: "Stuart Russell" },
+  { id: "B010", name: "Machine Learning", author: "Tom Mitchell" },
+  { id: "B011", name: "Deep Learning", author: "Ian Goodfellow" },
+  { id: "B012", name: "Computer Architecture", author: "John L. Hennessy" },
+  { id: "B013", name: "Compiler Design", author: "Alfred V. Aho" },
+  { id: "B014", name: "Software Engineering", author: "Ian Sommerville" },
+  { id: "B015", name: "Data Structures", author: "Mark Allen Weiss" },
+  { id: "B016", name: "Discrete Mathematics", author: "Kenneth H. Rosen" },
+  { id: "B017", name: "Linear Algebra", author: "Gilbert Strang" },
+  { id: "B018", name: "Probability & Statistics", author: "Sheldon Ross" },
+  { id: "B019", name: "Cryptography", author: "William Stallings" },
+  { id: "B020", name: "Computer Graphics", author: "Donald Hearn" },
+  { id: "B021", name: "Web Development", author: "Jon Duckett" },
+  { id: "B022", name: "Python Programming", author: "Mark Lutz" },
+  { id: "B023", name: "JavaScript: The Good Parts", author: "Douglas Crockford" },
+  { id: "B024", name: "System Design Interview", author: "Alex Xu" },
+  { id: "B025", name: "Cracking the Coding Interview", author: "Gayle McDowell" },
+];
