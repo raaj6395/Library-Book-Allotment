@@ -1,6 +1,5 @@
 import express from 'express';
 import Book from '../../models/Book';
-// ...existing code / auth middleware...
 // import requireAdmin from '../../middleware/requireAdmin'; // adapt to your middleware
 
 const router = express.Router();
@@ -55,9 +54,9 @@ router.delete('/:bookId', /* requireAdmin, */ async (req, res) => {
     book.isDeleted = true;
     book.deletedAt = new Date();
     await book.save();
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ message: err.message || 'Server error' });
+    return res.status(500).json({ message: err.message || 'Server error' });
   }
 });
 

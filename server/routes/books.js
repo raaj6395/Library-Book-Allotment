@@ -6,9 +6,11 @@ import Book from '../models/Book.js';
 const router = express.Router();
 
 // Get all books
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
+    console.log('Fetching all books');
     const books = await Book.find().sort({ createdAt: -1 });
+    console.log(`Found ${books.length} books`);
     res.json(books);
   } catch (error) {
     console.error('Error fetching books:', error);

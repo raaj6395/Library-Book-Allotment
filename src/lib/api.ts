@@ -83,6 +83,14 @@ export const booksAPI = {
   delete: (id: string) => apiRequest(`/books/${id}`, {
     method: 'DELETE',
   }),
+  list: async (opts: { search?: string; page?: number; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (opts.search) params.append('search', opts.search);
+    if (opts.page) params.append('page', String(opts.page));
+    if (opts.limit) params.append('limit', String(opts.limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest(`/books${query}`);
+  },
 };
 
 // Users API
@@ -122,23 +130,26 @@ export const allotmentAPI = {
   getMyAllocation: () => apiRequest('/allotment/my-allocation'),
 };
 
-// Admin Books API
+// Admin Books API - use admin endpoints and apiRequest (ensures credentials and correct base)
 export const adminBooksAPI = {
   list: async (opts: { search?: string; page?: number; limit?: number } = {}) => {
-    const params: any = {};
-    if (opts.search) params.search = opts.search;
-    if (opts.page) params.page = opts.page;
-    if (opts.limit) params.limit = opts.limit;
-    const res = await axios.get('/api/admin/books', { params });
-    return res.data;
+    const params = new URLSearchParams();
+    if (opts.search) params.append('search', opts.search);
+    if (opts.page) params.append('page', String(opts.page ?? 1));
+    if (opts.limit) params.append('limit', String(opts.limit ?? 20));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest(`/books${query}`);
   },
   create: async (payload: { title: string; author?: string }) => {
-    const res = await axios.post('/api/admin/books', payload);
-    return res.data;
+    return apiRequest('/admin/books', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
   remove: async (bookId: string) => {
-    const res = await axios.delete(`/api/admin/books/${bookId}`);
-    return res.data;
+    return apiRequest(`/admin/books/${bookId}`, {
+      method: 'DELETE',
+    });
   },
 };
 

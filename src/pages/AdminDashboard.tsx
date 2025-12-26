@@ -1,14 +1,8 @@
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { booksAPI, usersAPI, allotmentAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Users, BookOpen, Play, LogOut, Printer } from 'lucide-react';
+import {Users, BookOpen, Play, LogOut, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AddBookForm from '@/components/admin/AddBookForm';
 import AddUserForm from '@/components/admin/AddUserForm';
