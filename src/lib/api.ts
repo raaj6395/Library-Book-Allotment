@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Helper to get credentials
@@ -118,6 +120,26 @@ export const allotmentAPI = {
   getResults: (eventId: string) => apiRequest(`/allotment/results/${eventId}`),
   getEvents: () => apiRequest('/allotment/events'),
   getMyAllocation: () => apiRequest('/allotment/my-allocation'),
+};
+
+// Admin Books API
+export const adminBooksAPI = {
+  list: async (opts: { search?: string; page?: number; limit?: number } = {}) => {
+    const params: any = {};
+    if (opts.search) params.search = opts.search;
+    if (opts.page) params.page = opts.page;
+    if (opts.limit) params.limit = opts.limit;
+    const res = await axios.get('/api/admin/books', { params });
+    return res.data;
+  },
+  create: async (payload: { title: string; author?: string }) => {
+    const res = await axios.post('/api/admin/books', payload);
+    return res.data;
+  },
+  remove: async (bookId: string) => {
+    const res = await axios.delete(`/api/admin/books/${bookId}`);
+    return res.data;
+  },
 };
 
 export { getCredentials, setCredentials, removeCredentials };

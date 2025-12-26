@@ -16,6 +16,7 @@ interface UserFormData {
   course: string;
   batch: string;
   specialization: string;
+  cpi: number | null; // added
 }
 
 export default function AddUserForm() {
@@ -27,13 +28,16 @@ export default function AddUserForm() {
       course: '',
       batch: '',
       specialization: '',
+      cpi: null,
     },
   });
 
   const onSubmit = async (data: UserFormData) => {
     setLoading(true);
     try {
-      const user = await usersAPI.create(data);
+      // ensure cpi is sent as number
+      const payload = { ...data, cpi: Number(data.cpi) };
+      const user = await usersAPI.create(payload);
       setCreatedUser(user);
       toast({
         title: 'Success',
@@ -133,6 +137,25 @@ export default function AddUserForm() {
                   {...register('specialization')}
                   placeholder="Software Engineering"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cpi">CPI *</Label>
+                <Input
+                  id="cpi"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  max={10}
+                  {...register('cpi', {
+                    required: 'CPI is required',
+                    valueAsNumber: true,
+                    min: { value: 0, message: 'CPI must be at least 0' },
+                    max: { value: 10, message: 'CPI cannot exceed 10' },
+                  })}
+                  placeholder="8.5"
+                />
+                {errors.cpi && <p className="text-sm text-destructive">{errors.cpi.message}</p>}
               </div>
             </div>
 
