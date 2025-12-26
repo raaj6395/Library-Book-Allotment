@@ -54,7 +54,7 @@ export default function AddBookForm() {
       const items = Array.isArray(res) ? res : (res.items || []);
       setBooks(items);
     } catch (err: any) {
-      setListError(err?.response?.data?.message || err?.message || 'Failed to load books');
+      setListError(err?.message || 'Failed to load books');
     } finally {
       setListLoading(false);
     }
@@ -100,7 +100,7 @@ export default function AddBookForm() {
       setBooks((s) => [created, ...s]);
       toast({ title: 'Added', description: 'Book added' });
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to add book', variant: 'destructive' });
+      toast({ title: 'Error', description: err?.message || 'Failed to add book', variant: 'destructive' });
     } finally {
       setAdding(false);
     }
@@ -114,7 +114,7 @@ export default function AddBookForm() {
       setBooks((s) => s.filter((b) => b._id !== id));
       toast({ title: 'Deleted', description: 'Book deleted' });
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to delete', variant: 'destructive' });
+      toast({ title: 'Error', description: err?.message || 'Failed to delete', variant: 'destructive' });
     } finally {
       setDeleting(null);
     }
@@ -223,16 +223,13 @@ export default function AddBookForm() {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-md font-medium">All Books</h3>
-          <Input placeholder="Search by title or author" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Search by title or author" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
         </div>
 
-        {listLoading ? (
-          <div className="p-4">Loading...</div>
-        ) : listError ? (
-          <div className="p-4 text-destructive">{listError}</div>
-        ) : books.length === 0 ? (
-          <div className="p-4 text-muted-foreground">No books found.</div>
-        ) : (
+        <div className="relative">
+          {listError && (
+            <div className="p-4 text-destructive">{listError}</div>
+          )}
           <table className="w-full">
             <thead>
               <tr>
@@ -243,21 +240,40 @@ export default function AddBookForm() {
               </tr>
             </thead>
             <tbody>
-              {books.map((b) => (
-                <tr key={b._id} className="border-t">
-                  <td>{b.title}</td>
-                  <td>{b.author || '-'}</td>
-                  <td>{new Date(b.createdAt).toLocaleString()}</td>
-                  <td className="text-right">
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(b._id)} disabled={deleting === b._id}>
-                      {deleting === b._id ? 'Deleting...' : <><Trash className="mr-2 h-4 w-4" />Delete</>}
-                    </Button>
+              {listLoading && books.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                    Loading...
                   </td>
                 </tr>
-              ))}
+              ) : books.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                    No books found.
+                  </td>
+                </tr>
+              ) : (
+                books.map((b) => (
+                  <tr key={b._id} className="border-t">
+                    <td>{b.title}</td>
+                    <td>{b.author || '-'}</td>
+                    <td>{new Date(b.createdAt).toLocaleString()}</td>
+                    <td className="text-right">
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(b._id)} disabled={deleting === b._id}>
+                        {deleting === b._id ? 'Deleting...' : <><Trash className="mr-2 h-4 w-4" />Delete</>}
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-        )}
+          {listLoading && books.length > 0 && (
+            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center">
+              <div className="text-sm text-muted-foreground">Updating...</div>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

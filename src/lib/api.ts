@@ -41,7 +41,12 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    // Handle validation errors array format
+    if (error.errors && Array.isArray(error.errors)) {
+      const errorMessages = error.errors.map((e: any) => e.msg || e.message || JSON.stringify(e)).join(', ');
+      throw new Error(errorMessages);
+    }
+    throw new Error(error.error || error.message || `HTTP error! status: ${response.status}`);
   }
 
   return response.json();
@@ -130,7 +135,7 @@ export const allotmentAPI = {
   getMyAllocation: () => apiRequest('/allotment/my-allocation'),
 };
 
-// Admin Books API - use admin endpoints and apiRequest (ensures credentials and correct base)
+// Admin Books API - use books endpoints with authentication
 export const adminBooksAPI = {
   list: async (opts: { search?: string; page?: number; limit?: number } = {}) => {
     const params = new URLSearchParams();
@@ -141,13 +146,13 @@ export const adminBooksAPI = {
     return apiRequest(`/books${query}`);
   },
   create: async (payload: { title: string; author?: string }) => {
-    return apiRequest('/admin/books', {
+    return apiRequest('/books', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   },
   remove: async (bookId: string) => {
-    return apiRequest(`/admin/books/${bookId}`, {
+    return apiRequest(`/books/${bookId}`, {
       method: 'DELETE',
     });
   },

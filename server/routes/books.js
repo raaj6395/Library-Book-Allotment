@@ -8,10 +8,34 @@ const router = express.Router();
 // Get all books
 router.get('/', async (req, res) => {
   try {
-    console.log('Fetching all books');
-    const books = await Book.find().sort({ createdAt: -1 });
-    console.log(`Found ${books.length} books`);
-    res.json(books);
+    const search = String(req.query.search || '').trim();
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 100, 1);
+
+    const filter = {};
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filter.$or = [
+        { title: regex },
+        { author: regex },
+        { isbnOrBookId: regex },
+        { category: regex }
+      ];
+    }
+
+    const total = await Book.countDocuments(filter);
+    const items = await Book.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    // Support both array format (for backwards compatibility) and object format
+    if (req.query.search || req.query.page || req.query.limit) {
+      res.json({ items, page, limit, total });
+    } else {
+      // Backwards compatibility: return array if no query params
+      res.json(items);
+    }
   } catch (error) {
     console.error('Error fetching books:', error);
     res.status(500).json({ error: 'Server error' });
@@ -38,8 +62,8 @@ router.post('/',
   requireAdmin,
   [
     body('title').trim().notEmpty().withMessage('Title is required'),
-    body('author').trim().notEmpty().withMessage('Author is required'),
-    body('isbnOrBookId').trim().notEmpty().withMessage('ISBN/Book ID is required'),
+    body('author').optional().trim(),
+    body('isbnOrBookId').optional().trim(),
     body('totalCopies').optional().isInt({ min: 1 }).withMessage('Total copies must be at least 1')
   ],
   async (req, res) => {
@@ -51,16 +75,26 @@ router.post('/',
 
       const { title, author, isbnOrBookId, category, totalCopies = 1, description } = req.body;
 
+      // Auto-generate ISBN/Book ID if not provided (format: B + timestamp + random)
+      let finalIsbnOrBookId = isbnOrBookId;
+      if (!finalIsbnOrBookId || !finalIsbnOrBookId.trim()) {
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 1000);
+        finalIsbnOrBookId = `B${timestamp}${random}`;
+      } else {
+        finalIsbnOrBookId = finalIsbnOrBookId.trim();
+      }
+
       // Check if ISBN/Book ID already exists
-      const existingBook = await Book.findOne({ isbnOrBookId });
+      const existingBook = await Book.findOne({ isbnOrBookId: finalIsbnOrBookId });
       if (existingBook) {
         return res.status(400).json({ error: 'Book with this ISBN/Book ID already exists' });
       }
 
       const book = new Book({
-        title,
-        author,
-        isbnOrBookId,
+        title: title.trim(),
+        author: author ? author.trim() : '',
+        isbnOrBookId: finalIsbnOrBookId,
         category: category || '',
         totalCopies,
         availableCopies: totalCopies,
