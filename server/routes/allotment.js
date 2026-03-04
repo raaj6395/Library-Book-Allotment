@@ -4,17 +4,22 @@ import Preference from '../models/Preference.js';
 import Book from '../models/Book.js';
 import Allotment from '../models/Allotment.js';
 import AllotmentEvent from '../models/AllotmentEvent.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
 // Run allotment event (Admin only)
 router.post('/run', authenticate, requireAdmin, async (req, res) => {
+  //start transaction
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     // Create allotment event
     const event = new AllotmentEvent({
       runByAdminId: req.user.id
     });
-    await event.save();
+    await event.save({session});
 
     // Get all preferences sorted by submission time (first-come-first-serve)
     const preferences = await Preference.find()
@@ -29,51 +34,95 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       bookAvailability[book._id.toString()] = book.availableCopies;
     });
 
+    //get existing allocations
+    const existingAllocations = await Allotment.find({ status: 'allotted' });
+
+    const userBookMap = new Set();
+
+    existingAllocations.forEach(a => {
+      userBookMap.add(`${a.userId}_${a.bookId}`);
+    })
+
     const allocations = [];
     const waitlists = [];
 
     // Process each user's preferences
     for (const pref of preferences) {
-      let allocated = false;
-
       // Try to allocate based on user's preference order
-      for (const bookId of pref.rankedBookIds) {
-        const bookIdStr = bookId._id.toString();
-        
-        if (bookAvailability[bookIdStr] > 0) {
-          // Allocate book
-          const allocation = new Allotment({
-            eventId: event._id,
+      for (const book of pref.rankedBookIds) {
+        const bookId = book._id.toString();
+        const key = `${pref.userId._id}_${bookId}`;
+
+        //skip if already allocated earlier
+        if (userBookMap.has(key)) continue;
+
+        //if book available, then allocate
+        if (bookAvailability[bookId] > 0) {
+          //check if waitlisted already
+          const existingWaitlist = await Allotment.findOne({
             userId: pref.userId._id,
-            bookId: bookId._id,
-            status: 'allotted'
-          });
-          await allocation.save();
-          allocations.push(allocation);
+            bookId: bookId,
+            status: "waitlisted"
+          }).session(session);
+
+          if (existingWaitlist) {
+            // Upgrade waitlist to allotted
+            existingWaitlist.status = "allotted";
+            existingWaitlist.eventId = event._id;
+            existingWaitlist.createdAt = new Date();
+
+            await existingWaitlist.save({session});
+
+            allocations.push(existingWaitlist);
+          }
+          else {
+            // fresh Allocate book
+            const allocation = new Allotment({
+              eventId: event._id,
+              userId: pref.userId._id,
+              bookId: bookId,
+              status: 'allotted'
+            });
+            await allocation.save({session});
+            allocations.push(allocation);
+          }
 
           // Decrease availability
-          bookAvailability[bookIdStr]--;
-          await Book.findByIdAndUpdate(bookId._id, {
+          bookAvailability[bookId]--;
+          userBookMap.add(key);
+
+          await Book.findByIdAndUpdate(bookId, {
             $inc: { availableCopies: -1 }
+          }, {session});
+        }
+        else {
+          // If no book could be allocated, waitlist the first preference
+
+          //first check if the user+book is already in waitlist or not
+          const existingWaitlist = await Allotment.findOne({
+            userId: pref.userId._id,
+            bookId: bookId,
+            status: "waitlisted"
           });
 
-          allocated = true;
-          break;
+          if (!existingWaitlist) {
+            const waitlist = new Allotment({
+              eventId: event._id,
+              userId: pref.userId._id,
+              bookId: bookId,
+              status: "waitlisted"
+            });
+
+            await waitlist.save({session});
+            waitlists.push(waitlist);
+          }
         }
       }
-
-      // If no book could be allocated, waitlist the first preference
-      if (!allocated && pref.rankedBookIds.length > 0) {
-        const waitlist = new Allotment({
-          eventId: event._id,
-          userId: pref.userId._id,
-          bookId: pref.rankedBookIds[0]._id,
-          status: 'waitlisted'
-        });
-        await waitlist.save();
-        waitlists.push(waitlist);
-      }
     }
+
+    //end transaction
+    await session.commitTransaction();
+    session.endSession();
 
     // Get detailed results
     const results = await Allotment.find({ eventId: event._id })
@@ -89,6 +138,10 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       results
     });
   } catch (error) {
+    //abort transaction
+    await session.abortTransaction();
+    session.endSession();
+
     console.error('Error running allotment:', error);
     res.status(500).json({ error: 'Server error during allotment' });
   }
@@ -128,7 +181,7 @@ router.get('/my-allocation', authenticate, async (req, res) => {
   try {
     // Get the latest event
     const latestEvent = await AllotmentEvent.findOne().sort({ runAt: -1 });
-    
+
     if (!latestEvent) {
       return res.json(null);
     }
