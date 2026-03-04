@@ -31,5 +31,11 @@ const allotmentSchema = new mongoose.Schema({
 allotmentSchema.index({ eventId: 1, userId: 1 });
 allotmentSchema.index({ eventId: 1, bookId: 1 });
 
+// Prevent duplicate allocation for same user-book
+allotmentSchema.index({ userId: 1, bookId: 1 }, { unique: true });
+
+// Faster waitlist checks
+allotmentSchema.index({ userId: 1, bookId: 1, status: 1 });
+
 export default mongoose.model('Allotment', allotmentSchema);
 
