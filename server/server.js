@@ -8,6 +8,7 @@ import bookRoutes from './routes/books.js';
 import userRoutes from './routes/users.js';
 import preferenceRoutes from './routes/preferences.js';
 import allotmentRoutes from './routes/allotment.js';
+import { startEmailWorker } from './emailWorker/emailWorker.js';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/librar
 mongoose.connect(MONGODB_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB');
+    startEmailWorker();
   })
   .catch((error) => {
     console.error('❌ MongoDB connection error:', error);

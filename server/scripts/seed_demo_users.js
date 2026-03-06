@@ -27,8 +27,8 @@ const seedData = async () => {
     }).save();
 
     await new User({
-      name: 'John Doe',
-      email: 'john.doe@student.com',
+      name: 'Ankit Raj',
+      email: 'ankitraj224020@gmail.com',
       registrationNumber: 'STU001',
       password: 'user123',
       role: 'user',
@@ -51,10 +51,6 @@ const seedData = async () => {
     }).save();
 
     console.log('Created 3 users successfully');
-    console.log('  Admin: admin@library.com / admin123');
-    console.log('  User 1: john.doe@student.com / user123');
-    console.log('  User 2: jane.smith@student.com / user123');
-
     process.exit(0);
   } catch (error) {
     console.error('Error seeding data:', error);
