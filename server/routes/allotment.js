@@ -64,10 +64,13 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       bookAvailability[book._id.toString()] = book.availableCopies;
     });
 
+    // Drop preferences whose user was deleted after submission
+    const validPreferences = preferences.filter(pref => pref.userId != null);
+
     // Compute composite score for each student and sort:
     //   primary: compositeScore descending (higher score → processed first)
     //   tie-break: submittedAt ascending (earlier submission wins)
-    const scoredPrefs = preferences.map(pref => ({
+    const scoredPrefs = validPreferences.map(pref => ({
       pref,
       score: compositeScore(pref.userId, weights),
     }));
@@ -96,6 +99,7 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
 
         // Iterate over ALL preference slots (up to 10) to find the first eligible book
         for (const book of pref.rankedBookIds) {
+          if (book == null) continue; // book deleted after preference was submitted
           const bookId = book._id.toString();
 
           // Skip books that are unavailable or already allotted to this student
@@ -137,7 +141,7 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
         `;
       } else {
         const allottedBooks = pref.rankedBookIds.filter(b =>
-          userAllotted.has(b._id.toString())
+          b != null && userAllotted.has(b._id.toString())
         );
         const bookList = allottedBooks
           .map((b, i) => `<li>${i + 1}. <strong>${b.title}</strong> by ${b.author}</li>`)
