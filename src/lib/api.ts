@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Helper to get credentials
@@ -133,6 +131,23 @@ export const allotmentAPI = {
   getResults: (eventId: string) => apiRequest(`/allotment/results/${eventId}`),
   getEvents: () => apiRequest('/allotment/events'),
   getMyAllocation: () => apiRequest('/allotment/my-allocation'),
+  downloadReport: async (eventId: string) => {
+    const credentials = getCredentials();
+    const headers: HeadersInit = {};
+    if (credentials) {
+      headers['x-user-email'] = credentials.email;
+      headers['x-user-password'] = credentials.password;
+    }
+    const response = await fetch(`${API_BASE_URL}/allotment/report/${eventId}`, { headers });
+    if (!response.ok) throw new Error('Failed to download report');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `allotment-report-${eventId}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 // Admin Books API - use books endpoints with authentication

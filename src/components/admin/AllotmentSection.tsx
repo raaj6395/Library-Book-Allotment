@@ -3,7 +3,7 @@ import { allotmentAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Play, RefreshCw } from 'lucide-react';
+import { Download, Loader2, Play, RefreshCw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -17,7 +17,9 @@ import { Badge } from '@/components/ui/badge';
 export default function AllotmentSection() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<any[]>([]);
 
   useEffect(() => {
@@ -42,6 +44,7 @@ export default function AllotmentSection() {
     try {
       const data = await allotmentAPI.runAllotment();
       setResults(data);
+      setSelectedEventId(data.eventId);
       await loadEvents();
       toast({
         title: 'Success',
@@ -62,12 +65,29 @@ export default function AllotmentSection() {
     try {
       const data = await allotmentAPI.getResults(eventId);
       setResults({ results: data });
+      setSelectedEventId(eventId);
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error.message || 'Failed to load results',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    if (!selectedEventId) return;
+    setDownloading(true);
+    try {
+      await allotmentAPI.downloadReport(selectedEventId);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to download report',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -139,10 +159,20 @@ export default function AllotmentSection() {
                   {results.totalAllocations} allotted, {results.totalWaitlists} waitlisted
                 </CardDescription>
               </div>
-              <Button variant="outline" onClick={() => setResults(null)}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Close
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleDownloadReport} disabled={downloading}>
+                  {downloading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Download Report
+                </Button>
+                <Button variant="outline" onClick={() => setResults(null)}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Close
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

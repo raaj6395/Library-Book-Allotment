@@ -203,19 +203,22 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       .populate('userId', '_id')
       .populate('bookId', 'title');
 
-    // Map userId → allotted book titles
+    // Map userId → allotted book titles (skip orphaned allotment records)
     const allottedTitles = {}; // userId string → string[]
     for (const a of allotments) {
+      if (a.userId == null || a.bookId == null) continue;
       const uid = a.userId._id.toString();
       if (!allottedTitles[uid]) allottedTitles[uid] = [];
       allottedTitles[uid].push(a.bookId.title);
     }
 
-    // Build scored+sorted student rows
-    const scoredPrefs = preferences.map(pref => ({
-      pref,
-      score: compositeScore(pref.userId, weights),
-    }));
+    // Build scored+sorted student rows (skip preferences with deleted users)
+    const scoredPrefs = preferences
+      .filter(pref => pref.userId != null)
+      .map(pref => ({
+        pref,
+        score: compositeScore(pref.userId, weights),
+      }));
     scoredPrefs.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return new Date(a.pref.submittedAt) - new Date(b.pref.submittedAt);
@@ -223,11 +226,11 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
 
     // Sheet 1: Students
     const studentHeader = [
-      'Rank', 'Student ID', 'Name', 'Course', 'Branch', 'CPI',
-      'Composite Score', 'Book 1', 'Book 2', 'Book 3', 'Book 4', 'Book 5',
+      'Rank', 'Student ID', 'Name', 'Course',
+      'Book 1', 'Book 2', 'Book 3', 'Book 4', 'Book 5',
       'Submission Timestamp',
     ];
-    const studentRows = scoredPrefs.map(({ pref, score }, index) => {
+    const studentRows = scoredPrefs.map(({ pref }, index) => {
       const u = pref.userId;
       const books = allottedTitles[u._id.toString()] ?? [];
       const bookCols = [...books, '', '', '', '', ''].slice(0, 5);
@@ -236,9 +239,6 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
         u.registrationNumber ?? '',
         u.name ?? '',
         u.course ?? '',
-        u.branch ?? '',
-        u.cpi ?? 0,
-        score.toFixed(3),
         ...bookCols,
         pref.submittedAt ? new Date(pref.submittedAt).toISOString() : '',
       ];
