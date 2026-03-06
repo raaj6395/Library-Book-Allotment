@@ -26,30 +26,6 @@ const seedData = async () => {
       cpi: 8.5
     }).save();
 
-    await new User({
-      name: 'Ankit Raj',
-      email: 'ankitraj224020@gmail.com',
-      registrationNumber: 'STU001',
-      password: 'user123',
-      role: 'user',
-      course: 'B.Tech',
-      batch: '2024',
-      branch: 'Computer Science',
-      cpi: 8.5
-    }).save();
-
-    await new User({
-      name: 'Jane Smith',
-      email: 'jane.smith@student.com',
-      registrationNumber: 'STU002',
-      password: 'user123',
-      role: 'user',
-      course: 'B.Tech',
-      batch: '2024',
-      branch: 'Information Technology',
-      cpi: 7.9
-    }).save();
-
     console.log('Created 3 users successfully');
     process.exit(0);
   } catch (error) {

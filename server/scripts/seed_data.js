@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const scripts = ['seed_students.js', 'seed_books.js', 'seed_demo_users.js'];
+const scripts = ['seed_students.js', 'seed_books.js', 'seed_admin.js'];
 
 for (const script of scripts) {
   const scriptPath = join(__dirname, script);
