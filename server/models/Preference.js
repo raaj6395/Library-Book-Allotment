@@ -12,9 +12,9 @@ const preferenceSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: function(v) {
-        return v.length > 0 && v.length <= 5; // Max 5 preferences
+        return v.length > 0 && v.length <= 10; // Max 10 preferences
       },
-      message: 'Must have between 1 and 5 book preferences'
+      message: 'Must have between 1 and 10 book preferences'
     }
   },
   submittedAt: {

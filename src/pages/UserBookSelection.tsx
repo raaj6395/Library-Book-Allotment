@@ -68,10 +68,10 @@ export default function UserBookSelection() {
     if (selectedBooks.includes(bookId)) {
       setSelectedBooks(selectedBooks.filter(id => id !== bookId));
     } else {
-      if (selectedBooks.length >= 5) {
+      if (selectedBooks.length >= 10) {
         toast({
           title: 'Limit Reached',
-          description: 'You can select a maximum of 5 books',
+          description: 'You can select a maximum of 10 books',
           variant: 'destructive',
         });
         return;
@@ -138,7 +138,7 @@ export default function UserBookSelection() {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
-        {myAllocation && (
+        {myAllocation?.length > 0 && (
           <Card className="border-green-200 bg-green-50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -147,18 +147,20 @@ export default function UserBookSelection() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <p className="text-lg font-semibold">{myAllocation.bookId?.title}</p>
-                <p className="text-muted-foreground">by {myAllocation.bookId?.author}</p>
-                <Badge variant={myAllocation.status === 'allotted' ? 'default' : 'secondary'}>
-                  {myAllocation.status}
-                </Badge>
-              </div>
+              <ol className="list-decimal list-inside space-y-2">
+                {myAllocation.map((a: any) => (
+                  <li key={a._id}>
+                    <span className="font-semibold">{a.bookId?.title}</span>
+                    <span className="text-muted-foreground"> by {a.bookId?.author}</span>
+                    <Badge variant="default" className="ml-2">{a.status}</Badge>
+                  </li>
+                ))}
+              </ol>
             </CardContent>
           </Card>
         )}
 
-        {myPreferences && !myAllocation && (
+        {myPreferences && !(myAllocation?.length > 0) && (
           <Card>
             <CardHeader>
               <CardTitle>Your Submitted Preferences</CardTitle>
@@ -182,7 +184,7 @@ export default function UserBookSelection() {
           <CardHeader>
             <CardTitle>Available Books</CardTitle>
             <CardDescription>
-              Select up to 5 books in order of preference (drag to reorder)
+              Select up to 10 books in order of preference (drag to reorder)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -238,7 +240,7 @@ export default function UserBookSelection() {
 
               {selectedBooks.length > 0 && (
                 <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <p className="font-semibold mb-2">Your Selection ({selectedBooks.length}/5):</p>
+                  <p className="font-semibold mb-2">Your Selection ({selectedBooks.length}/10):</p>
                   <ol className="list-decimal list-inside space-y-1">
                     {selectedBooks.map((bookId, index) => {
                       const book = books.find(b => b._id === bookId);

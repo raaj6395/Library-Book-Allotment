@@ -26,7 +26,7 @@ router.get('/me', authenticate, async (req, res) => {
 router.post('/',
   authenticate,
   [
-    body('rankedBookIds').isArray({ min: 1, max: 5 }).withMessage('Must provide 1-5 book preferences'),
+    body('rankedBookIds').isArray({ min: 1, max: 10 }).withMessage('Must provide 1-10 book preferences'),
     body('rankedBookIds.*').isMongoId().withMessage('Invalid book ID')
   ],
   async (req, res) => {
