@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import Book from '../models/Book.js';
+import Book from '../models/Book.model.js';
 
 const router = express.Router();
 

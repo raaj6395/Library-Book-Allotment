@@ -1,4 +1,4 @@
-import EmailQueue from './emailQueue.model.js';
+import EmailQueue from '../models/emailQueue.model.js';
 import getTransporter from './nodemailerTransport.js';
 
 const MAX_ATTEMPTS = 3;

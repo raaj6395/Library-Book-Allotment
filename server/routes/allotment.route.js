@@ -1,10 +1,10 @@
 import express from 'express';
 import xlsx from 'xlsx';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import Preference from '../models/Preference.js';
-import Book from '../models/Book.js';
-import Allotment from '../models/Allotment.js';
-import AllotmentEvent from '../models/AllotmentEvent.js';
+import Preference from '../models/Preference.model.js';
+import Book from '../models/Book.model.js';
+import Allotment from '../models/Allotment.model.js';
+import AllotmentEvent from '../models/AllotmentEvent.model.js';
 import { addEmailToQueue } from '../emailWorker/emailService.js';
 
 const router = express.Router();

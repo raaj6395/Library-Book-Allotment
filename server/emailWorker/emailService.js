@@ -1,4 +1,4 @@
-import EmailQueue from './emailQueue.model.js';
+import EmailQueue from '../models/emailQueue.model.js';
 
 /**
  * Push an email job into the queue. Fire-and-forget — returns immediately.

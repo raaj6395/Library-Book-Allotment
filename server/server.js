@@ -3,11 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
-import authRoutes from './routes/auth.js';
-import bookRoutes from './routes/books.js';
-import userRoutes from './routes/users.js';
-import preferenceRoutes from './routes/preferences.js';
-import allotmentRoutes from './routes/allotment.js';
+import authRoutes from './routes/auth.route.js';
+import bookRoutes from './routes/books.route.js';
+import userRoutes from './routes/users.route.js';
+import preferenceRoutes from './routes/preferences.route.js';
+import allotmentRoutes from './routes/allotment.route.js';
 import { startEmailWorker } from './emailWorker/emailWorker.js';
 
 dotenv.config();

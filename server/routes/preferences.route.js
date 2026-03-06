@@ -1,8 +1,8 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
-import Preference from '../models/Preference.js';
-import Book from '../models/Book.js';
+import Preference from '../models/Preference.model.js';
+import Book from '../models/Book.model.js';
 
 const router = express.Router();
 

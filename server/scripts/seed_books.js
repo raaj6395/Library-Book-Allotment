@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 import { read, utils } from 'xlsx';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import Book from '../models/Book.js';
+import Book from '../models/Book.model.js';
 
 dotenv.config();
 

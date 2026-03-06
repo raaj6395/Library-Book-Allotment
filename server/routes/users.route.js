@@ -1,8 +1,8 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import User from '../models/User.js';
-import Student from '../models/Student.js';
+import User from '../models/User.model.js';
+import Student from '../models/Student.model.js';
 import { addEmailToQueue } from '../emailWorker/emailService.js';
 import crypto from 'crypto';
 
