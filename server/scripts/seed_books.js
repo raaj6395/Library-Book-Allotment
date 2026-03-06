@@ -11,7 +11,6 @@ dotenv.config();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/library-book-allotment';
 
-// Excel stores dates as days since 1899-12-30
 const excelDateToJS = (serial) => {
   if (!serial || typeof serial !== 'number') return new Date();
   return new Date((serial - 25569) * 86400 * 1000);

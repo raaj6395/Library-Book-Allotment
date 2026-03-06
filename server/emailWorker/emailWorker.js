@@ -5,14 +5,13 @@ const MAX_ATTEMPTS = 3;
 const POLL_INTERVAL_MS = 5000;
 
 async function processNextJob() {
-  // Atomically claim one pending job → prevents race conditions
   const job = await EmailQueue.findOneAndUpdate(
     { status: 'pending' },
     { $set: { status: 'processing' } },
     { new: true }
   );
 
-  if (!job) return; // nothing to do
+  if (!job) return;
 
   try {
     const transporter = getTransporter();
@@ -37,7 +36,7 @@ async function processNextJob() {
       console.error(`   GMAIL_USER: ${process.env.GMAIL_USER ?? 'NOT SET'}`);
       console.error(`   GMAIL_APP_PASSWORD: ${process.env.GMAIL_APP_PASSWORD ? '***set***' : 'NOT SET'}`);
     } else {
-      job.status = 'pending'; // re-queue for retry
+      job.status = 'pending';
       console.warn(`⚠️  Email failed (attempt ${job.attempts}/${MAX_ATTEMPTS}) for ${job.sendToEmail}`);
       console.warn(`   Reason: ${err.message}`);
     }

@@ -86,7 +86,6 @@ export default function UserCredentialsPrint({ user, onClose }: UserCredentialsP
         </CardContent>
       </Card>
 
-      {/* Print-only version */}
       <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:p-8">
         <div className="border-b pb-4 mb-4">
           <h1 className="text-2xl font-bold">User Credentials</h1>

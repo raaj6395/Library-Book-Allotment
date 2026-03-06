@@ -2,13 +2,11 @@ import express from 'express';
 import { MAX_BOOK_PREFERENCES } from '../config/constants';
 import User from '../models/User';
 import Book from '../models/Book';
-// ...auth middleware assumed...
 
 const router = express.Router();
 
-// Submit preferences
 router.post('/', async (req, res) => {
-  const userId = (req as any).user?.id; // adapt to your auth
+  const userId = (req as any).user?.id;
   const { bookIds } = req.body as { bookIds: string[] };
 
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
@@ -23,7 +21,6 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ message: 'Duplicate book selections are not allowed' });
   }
 
-  // Ensure books exist and are not deleted
   const books = await Book.find({ _id: { $in: bookIds }, isDeleted: false }).select('_id');
   if (books.length !== bookIds.length) {
     return res.status(400).json({ message: 'Some selected books are not available' });
@@ -36,8 +33,7 @@ router.post('/', async (req, res) => {
     return res.status(409).json({ message: 'Preferences have already been submitted' });
   }
 
-  // Persist order in a preference document or on user
-  user.set('preferences', bookIds); // assumes a 'preferences' field; adapt if separate model used
+  user.set('preferences', bookIds);
   user.set('preferencesSubmittedAt', new Date());
   await user.save();
 

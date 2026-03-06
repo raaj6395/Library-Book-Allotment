@@ -2,7 +2,6 @@ import express from 'express';
 import { MAX_BOOK_PREFERENCES } from '../config/constants';
 import User from '../models/User';
 import Book from '../models/Book';
-// ...auth middleware...
 
 const router = express.Router();
 
@@ -24,7 +23,6 @@ router.get('/library-status', async (req, res) => {
     preferences.books = await Book.find({ _id: { $in: preferences.bookIds } }).select('_id title author');
   }
 
-  // Simple placeholder for allotment - adapt to your allotment model
   const allotment = {
     isAllotted: false,
     allottedAt: null,

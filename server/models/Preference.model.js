@@ -12,7 +12,7 @@ const preferenceSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: function(v) {
-        return v.length > 0 && v.length <= 10; // Max 10 preferences
+        return v.length > 0 && v.length <= 10;
       },
       message: 'Must have between 1 and 10 book preferences'
     }
@@ -23,8 +23,6 @@ const preferenceSchema = new mongoose.Schema({
   }
 });
 
-// Ensure one preference per user
 preferenceSchema.index({ userId: 1 }, { unique: true });
 
 export default mongoose.model('Preference', preferenceSchema);
-

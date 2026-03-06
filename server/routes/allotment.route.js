@@ -12,7 +12,6 @@ const router = express.Router();
 const ROUNDS = 5;
 const MAX_BOOKS_PER_STUDENT = 5;
 
-// Numeric priority for course strings (0–10 scale, higher = ranked first)
 const COURSE_RANK = {
   'PhD': 10,
   'M.Tech': 8,
@@ -27,49 +26,39 @@ function getCourseScore(course) {
 }
 
 function getWeights() {
-  const w1 = parseFloat(process.env.RANK_W1 ?? '0.40'); // course weight
-  const w2 = parseFloat(process.env.RANK_W2 ?? '0.35'); // branch weight
-  const w3 = parseFloat(process.env.RANK_W3 ?? '0.25'); // CPI weight
+  const w1 = parseFloat(process.env.RANK_W1 ?? '0.40');
+  const w2 = parseFloat(process.env.RANK_W2 ?? '0.35');
+  const w3 = parseFloat(process.env.RANK_W3 ?? '0.25');
   return { w1, w2, w3 };
 }
 
 function compositeScore(user, { w1, w2, w3 }) {
   const courseScore = getCourseScore(user?.course);
-  // Branch ordering is not defined; use neutral mid-range so weight is non-zero
-  // but does not discriminate between students with different branches.
   const branchScore = 5;
   const cpiScore = user?.cpi ?? 0;
   return courseScore * w1 + branchScore * w2 + cpiScore * w3;
 }
 
-// Run allotment event (Admin only)
 router.post('/run', authenticate, requireAdmin, async (req, res) => {
   try {
     const weights = getWeights();
 
-    // Create allotment event
     const event = new AllotmentEvent({ runByAdminId: req.user.id });
     await event.save();
 
-    // Fetch all preferences with populated user and book data
     const preferences = await Preference.find()
       .populate('userId')
       .populate('rankedBookIds')
       .sort({ submittedAt: 1 });
 
-    // Build in-memory availability map (bookId string → available copies)
     const allBooks = await Book.find();
     const bookAvailability = {};
     allBooks.forEach(book => {
       bookAvailability[book._id.toString()] = book.availableCopies;
     });
 
-    // Drop preferences whose user was deleted after submission
     const validPreferences = preferences.filter(pref => pref.userId != null);
 
-    // Compute composite score for each student and sort:
-    //   primary: compositeScore descending (higher score → processed first)
-    //   tie-break: submittedAt ascending (earlier submission wins)
     const scoredPrefs = validPreferences.map(pref => ({
       pref,
       score: compositeScore(pref.userId, weights),
@@ -80,7 +69,6 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       return new Date(a.pref.submittedAt) - new Date(b.pref.submittedAt);
     });
 
-    // Track books allotted to each user in this run (userId string → Set of bookId strings)
     const allottedPerUser = {};
     scoredPrefs.forEach(({ pref }) => {
       allottedPerUser[pref.userId._id.toString()] = new Set();
@@ -88,25 +76,20 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
 
     const allAllocations = [];
 
-    // 5 rounds — each student gets at most 1 book per round, 5 books maximum total
     for (let round = 0; round < ROUNDS; round++) {
       for (const { pref } of scoredPrefs) {
         const userId = pref.userId._id.toString();
         const userAllotted = allottedPerUser[userId];
 
-        // Skip if student already holds the maximum number of books
         if (userAllotted.size >= MAX_BOOKS_PER_STUDENT) continue;
 
-        // Iterate over ALL preference slots (up to 10) to find the first eligible book
         for (const book of pref.rankedBookIds) {
-          if (book == null) continue; // book deleted after preference was submitted
+          if (book == null) continue;
           const bookId = book._id.toString();
 
-          // Skip books that are unavailable or already allotted to this student
           if (!(bookAvailability[bookId] > 0)) continue;
           if (userAllotted.has(bookId)) continue;
 
-          // Allot the book
           const allocation = new Allotment({
             eventId: event._id,
             userId: pref.userId._id,
@@ -116,17 +99,15 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
           await allocation.save();
           allAllocations.push(allocation);
 
-          // Decrement availability in memory and in DB
           bookAvailability[bookId]--;
           await Book.findByIdAndUpdate(book._id, { $inc: { availableCopies: -1 } });
 
           userAllotted.add(bookId);
-          break; // at most one book per round per student
+          break;
         }
       }
     }
 
-    // Post-allotment emails — one email per student who submitted preferences
     for (const { pref } of scoredPrefs) {
       const user = pref.userId;
       const userId = user._id.toString();
@@ -161,7 +142,6 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       });
     }
 
-    // Return JSON summary (API contract unchanged)
     const results = await Allotment.find({ eventId: event._id })
       .populate('userId', 'name email registrationNumber course batch branch')
       .populate('bookId', 'title author isbnOrBookId')
@@ -171,7 +151,7 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       eventId: event._id,
       runAt: event.runAt,
       totalAllocations: allAllocations.length,
-      totalWaitlists: 0, // waitlisting removed in favour of multi-round allocation
+      totalWaitlists: 0,
       results,
     });
   } catch (error) {
@@ -180,8 +160,6 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Download Excel report for an allotment event (Admin only)
-// GET /api/allotment/report/:eventId
 router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
   try {
     const event = await AllotmentEvent.findById(req.params.eventId);
@@ -189,13 +167,11 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
 
     const weights = getWeights();
 
-    // Fetch all preferences sorted by composite score for rank assignment
     const preferences = await Preference.find()
       .populate('userId')
       .populate('rankedBookIds')
       .sort({ submittedAt: 1 });
 
-    // Fetch all allotments for this event (allotted only)
     const allotments = await Allotment.find({
       eventId: req.params.eventId,
       status: 'allotted',
@@ -203,8 +179,7 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       .populate('userId', '_id')
       .populate('bookId', 'title');
 
-    // Map userId → allotted book titles (skip orphaned allotment records)
-    const allottedTitles = {}; // userId string → string[]
+    const allottedTitles = {};
     for (const a of allotments) {
       if (a.userId == null || a.bookId == null) continue;
       const uid = a.userId._id.toString();
@@ -212,7 +187,6 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       allottedTitles[uid].push(a.bookId.title);
     }
 
-    // Build scored+sorted student rows (skip preferences with deleted users)
     const scoredPrefs = preferences
       .filter(pref => pref.userId != null)
       .map(pref => ({
@@ -224,7 +198,6 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       return new Date(a.pref.submittedAt) - new Date(b.pref.submittedAt);
     });
 
-    // Sheet 1: Students
     const studentHeader = [
       'Rank', 'Student ID', 'Name', 'Course',
       'Book 1', 'Book 2', 'Book 3', 'Book 4', 'Book 5',
@@ -244,7 +217,6 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       ];
     });
 
-    // Sheet 2: Books
     const allBooks = await Book.find();
     const bookHeader = [
       'Book ID', 'Title', 'Initial Quantity', 'Remaining Quantity', 'Status',
@@ -257,7 +229,6 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       b.availableCopies === 0 ? 'Unavailable' : 'Available',
     ]);
 
-    // Build workbook
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(
       wb,
@@ -283,7 +254,6 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Get allotment results (Admin only)
 router.get('/results/:eventId', authenticate, requireAdmin, async (req, res) => {
   try {
     const results = await Allotment.find({ eventId: req.params.eventId })
@@ -298,7 +268,6 @@ router.get('/results/:eventId', authenticate, requireAdmin, async (req, res) => 
   }
 });
 
-// Get all allotment events (Admin only)
 router.get('/events', authenticate, requireAdmin, async (_req, res) => {
   try {
     const events = await AllotmentEvent.find()
@@ -312,7 +281,6 @@ router.get('/events', authenticate, requireAdmin, async (_req, res) => {
   }
 });
 
-// Get user's allocations (for normal users) — returns array (up to 5 books)
 router.get('/my-allocation', authenticate, async (req, res) => {
   try {
     const latestEvent = await AllotmentEvent.findOne().sort({ runAt: -1 });

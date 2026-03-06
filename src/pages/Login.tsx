@@ -23,7 +23,6 @@ export default function Login() {
 
     try {
       const data = await login(email, password);
-      // Redirect based on role
       if (data.user.role === 'admin') {
         navigate('/admin');
       } else {
@@ -52,7 +51,7 @@ export default function Login() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email / Registration</Label>
               <Input
@@ -105,4 +104,3 @@ export default function Login() {
     </div>
   );
 }
-

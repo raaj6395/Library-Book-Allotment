@@ -8,7 +8,6 @@ import crypto from 'crypto';
 
 const router = express.Router();
 
-// Get all users (Admin only)
 router.get('/', authenticate, requireAdmin, async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
@@ -19,7 +18,6 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Get single user (Admin only)
 router.get('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
@@ -33,7 +31,6 @@ router.get('/:id', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Create user (Admin only) — looks up student by registration number
 router.post('/',
   authenticate,
   requireAdmin,
@@ -49,19 +46,16 @@ router.post('/',
 
       const { registration_number } = req.body;
 
-      // Look up student
       const student = await Student.findOne({ registrationNumber: registration_number });
       if (!student) {
         return res.status(404).json({ error: 'No student found with this registration number' });
       }
 
-      // Check if user already exists for this student
       const existingUser = await User.findOne({ registrationNumber: registration_number });
       if (existingUser) {
         return res.status(409).json({ error: 'User already exists for this student' });
       }
 
-      // Generate secure 10-char alphanumeric password
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
       const tempPassword = Array.from(crypto.randomBytes(10))
         .map(b => chars[b % chars.length])
@@ -81,7 +75,6 @@ router.post('/',
 
       await user.save();
 
-      // Send credentials email (fire-and-forget)
       await addEmailToQueue({
         sendToEmail: student.email,
         title: 'Your Library System Credentials',
@@ -102,7 +95,6 @@ router.post('/',
   }
 );
 
-// Update user (Admin only)
 router.put('/:id',
   authenticate,
   requireAdmin,
@@ -147,7 +139,6 @@ router.put('/:id',
   }
 );
 
-// Delete user (Admin only)
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
@@ -162,4 +153,3 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 export default router;
-

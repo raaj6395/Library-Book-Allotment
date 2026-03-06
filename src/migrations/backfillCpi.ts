@@ -1,8 +1,6 @@
 import mongoose from 'mongoose';
 import User from '../models/User';
 
-// ...existing code or run script bootstrap...
-
 async function backfill() {
   await mongoose.connect(process.env.MONGO_URI!);
   const res = await User.updateMany(

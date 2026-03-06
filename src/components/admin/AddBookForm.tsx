@@ -39,7 +39,6 @@ export default function AddBookForm() {
     },
   });
 
-  // debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
@@ -50,7 +49,6 @@ export default function AddBookForm() {
     setListError(null);
     try {
       const res = await adminBooksAPI.list({ search: debouncedSearch, page: 1, limit: 100 });
-      // handle both shapes: { items: [...] } or [...] (backwards compatibility)
       const items = Array.isArray(res) ? res : (res.items || []);
       setBooks(items);
     } catch (err: any) {
@@ -96,7 +94,6 @@ export default function AddBookForm() {
       const created = await adminBooksAPI.create({ title: title.trim(), author: author.trim() || undefined });
       setTitle('');
       setAuthor('');
-      // optimistic update: add created book to UI
       setBooks((s) => [created, ...s]);
       toast({ title: 'Added', description: 'Book added' });
     } catch (err: any) {
@@ -278,4 +275,3 @@ export default function AddBookForm() {
     </div>
   );
 }
-

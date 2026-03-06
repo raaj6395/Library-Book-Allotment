@@ -27,7 +27,6 @@ const BookSchema = new Schema<IBook>(
   { timestamps: true }
 );
 
-// helper to get non-deleted books
 BookSchema.statics.findActive = function (filter = {}) {
   return this.find({ ...filter, isDeleted: false });
 };

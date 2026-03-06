@@ -16,7 +16,6 @@ export default function AdminBooksPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
@@ -60,7 +59,6 @@ export default function AdminBooksPage() {
     setDeleting(id);
     try {
       await adminBooksAPI.remove(id);
-      // remove locally to avoid refetch
       setBooks((s) => s.filter((b) => b._id !== id));
     } finally {
       setDeleting(null);

@@ -3,7 +3,6 @@ import Book from '../models/Book';
 
 const router = express.Router();
 
-// GET /api/books?search=&page=1&limit=20
 router.get('/', async (req, res) => {
   try {
     const search = String(req.query.search || '').trim();
@@ -29,7 +28,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/books - create book (basic validation)
 router.post('/', async (req, res) => {
   try {
     const { title, author, isbn, category, copies, description } = req.body || {};

@@ -27,9 +27,7 @@ const allotmentSchema = new mongoose.Schema({
   }
 });
 
-// Index for efficient queries
 allotmentSchema.index({ eventId: 1, userId: 1 });
 allotmentSchema.index({ eventId: 1, bookId: 1 });
 
 export default mongoose.model('Allotment', allotmentSchema);
-

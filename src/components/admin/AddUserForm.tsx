@@ -31,7 +31,6 @@ export default function AddUserForm() {
       reset();
     } catch (error: any) {
       const msg: string = error.message || 'Failed to create user';
-      // Show 404 / 409 inline; other errors via toast
       if (msg.includes('No student found') || msg.includes('User already exists')) {
         setInlineError(msg);
       } else {

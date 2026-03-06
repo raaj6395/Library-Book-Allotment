@@ -1,10 +1,8 @@
 import express from 'express';
 import Book from '../../models/Book';
-// import requireAdmin from '../../middleware/requireAdmin'; // adapt to your middleware
 
 const router = express.Router();
 
-// GET /api/admin/books?search=&page=1&limit=20
 router.get('/', /* requireAdmin, */ async (req, res) => {
   try {
     const search = (req.query.search as string) || '';
@@ -30,7 +28,6 @@ router.get('/', /* requireAdmin, */ async (req, res) => {
   }
 });
 
-// POST /api/admin/books
 router.post('/', /* requireAdmin, */ async (req, res) => {
   try {
     const { title, author } = req.body;
@@ -42,13 +39,11 @@ router.post('/', /* requireAdmin, */ async (req, res) => {
   }
 });
 
-// DELETE /api/admin/books/:bookId (soft delete, idempotent success)
 router.delete('/:bookId', /* requireAdmin, */ async (req, res) => {
   try {
     const { bookId } = req.params;
     const book = await Book.findById(bookId);
     if (!book || book.isDeleted) {
-      // idempotent success
       return res.json({ success: true });
     }
     book.isDeleted = true;

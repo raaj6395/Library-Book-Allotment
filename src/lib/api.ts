@@ -1,25 +1,21 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// Helper to get credentials
 const getCredentials = () => {
   const email = localStorage.getItem('user_email');
   const password = localStorage.getItem('user_password');
   return email && password ? { email, password } : null;
 };
 
-// Helper to set credentials
 const setCredentials = (email: string, password: string) => {
   localStorage.setItem('user_email', email);
   localStorage.setItem('user_password', password);
 };
 
-// Helper to remove credentials
 const removeCredentials = () => {
   localStorage.removeItem('user_email');
   localStorage.removeItem('user_password');
 };
 
-// Generic fetch wrapper
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   const credentials = getCredentials();
   const headers: HeadersInit = {
@@ -39,7 +35,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Network error' }));
-    // Handle validation errors array format
     if (error.errors && Array.isArray(error.errors)) {
       const errorMessages = error.errors.map((e: any) => e.msg || e.message || JSON.stringify(e)).join(', ');
       throw new Error(errorMessages);
@@ -50,14 +45,12 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   return response.json();
 };
 
-// Auth API
 export const authAPI = {
   login: async (email: string, password: string) => {
     const data = await apiRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    // Store credentials for subsequent requests
     setCredentials(email, password);
     return data;
   },
@@ -71,7 +64,6 @@ export const authAPI = {
   },
 };
 
-// Books API
 export const booksAPI = {
   getAll: () => apiRequest('/books'),
   getById: (id: string) => apiRequest(`/books/${id}`),
@@ -96,7 +88,6 @@ export const booksAPI = {
   },
 };
 
-// Users API
 export const usersAPI = {
   getAll: () => apiRequest('/users'),
   getById: (id: string) => apiRequest(`/users/${id}`),
@@ -113,7 +104,6 @@ export const usersAPI = {
   }),
 };
 
-// Preferences API
 export const preferencesAPI = {
   getMyPreferences: () => apiRequest('/preferences/me'),
   submitPreferences: (rankedBookIds: string[]) => apiRequest('/preferences', {
@@ -123,7 +113,6 @@ export const preferencesAPI = {
   getAll: () => apiRequest('/preferences/all'),
 };
 
-// Allotment API
 export const allotmentAPI = {
   runAllotment: () => apiRequest('/allotment/run', {
     method: 'POST',
@@ -150,7 +139,6 @@ export const allotmentAPI = {
   },
 };
 
-// Admin Books API - use books endpoints with authentication
 export const adminBooksAPI = {
   list: async (opts: { search?: string; page?: number; limit?: number } = {}) => {
     const params = new URLSearchParams();
@@ -174,4 +162,3 @@ export const adminBooksAPI = {
 };
 
 export { getCredentials, setCredentials, removeCredentials };
-

@@ -5,7 +5,6 @@ import Book from '../models/Book.model.js';
 
 const router = express.Router();
 
-// Get all books
 router.get('/', async (req, res) => {
   try {
     const search = String(req.query.search || '').trim();
@@ -29,11 +28,9 @@ router.get('/', async (req, res) => {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    // Support both array format (for backwards compatibility) and object format
     if (req.query.search || req.query.page || req.query.limit) {
       res.json({ items, page, limit, total });
     } else {
-      // Backwards compatibility: return array if no query params
       res.json(items);
     }
   } catch (error) {
@@ -42,7 +39,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single book
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
@@ -56,7 +52,6 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// Add book (Admin only)
 router.post('/',
   authenticate,
   requireAdmin,
@@ -75,7 +70,6 @@ router.post('/',
 
       const { title, author, isbnOrBookId, category, totalCopies = 1, description } = req.body;
 
-      // Auto-generate ISBN/Book ID if not provided (format: B + timestamp + random)
       let finalIsbnOrBookId = isbnOrBookId;
       if (!finalIsbnOrBookId || !finalIsbnOrBookId.trim()) {
         const timestamp = Date.now();
@@ -85,7 +79,6 @@ router.post('/',
         finalIsbnOrBookId = finalIsbnOrBookId.trim();
       }
 
-      // Check if ISBN/Book ID already exists
       const existingBook = await Book.findOne({ isbnOrBookId: finalIsbnOrBookId });
       if (existingBook) {
         return res.status(400).json({ error: 'Book with this ISBN/Book ID already exists' });
@@ -113,7 +106,6 @@ router.post('/',
   }
 );
 
-// Update book (Admin only)
 router.put('/:id',
   authenticate,
   requireAdmin,
@@ -155,7 +147,6 @@ router.put('/:id',
   }
 );
 
-// Delete book (Admin only)
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const book = await Book.findByIdAndDelete(req.params.id);
@@ -170,4 +161,3 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 export default router;
-

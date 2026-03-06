@@ -6,12 +6,11 @@ import Book from '../models/Book.model.js';
 
 const router = express.Router();
 
-// Get user's preferences
 router.get('/me', authenticate, async (req, res) => {
   try {
     const preference = await Preference.findOne({ userId: req.user.id })
       .populate('rankedBookIds', 'title author isbnOrBookId');
-    
+
     if (!preference) {
       return res.json(null);
     }
@@ -22,7 +21,6 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
-// Submit/Update preferences
 router.post('/',
   authenticate,
   [
@@ -38,21 +36,17 @@ router.post('/',
 
       const { rankedBookIds } = req.body;
 
-      // Verify all books exist
       const books = await Book.find({ _id: { $in: rankedBookIds } });
       if (books.length !== rankedBookIds.length) {
         return res.status(400).json({ error: 'One or more books not found' });
       }
 
-      // Check if user already has preferences
       let preference = await Preference.findOne({ userId: req.user.id });
 
       if (preference) {
-        // Update existing preferences
         preference.rankedBookIds = rankedBookIds;
         preference.submittedAt = new Date();
       } else {
-        // Create new preferences
         preference = new Preference({
           userId: req.user.id,
           rankedBookIds
@@ -70,7 +64,6 @@ router.post('/',
   }
 );
 
-// Get all preferences (Admin only)
 router.get('/all', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -90,4 +83,3 @@ router.get('/all', authenticate, async (req, res) => {
 });
 
 export default router;
-

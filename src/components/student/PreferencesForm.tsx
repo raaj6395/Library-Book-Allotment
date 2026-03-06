@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
-// ...UI components...
 
 export default function PreferencesForm() {
   const [max, setMax] = useState<number>(5);
@@ -16,7 +15,6 @@ export default function PreferencesForm() {
       setMax(cfg.data.maxBookPreferences ?? 5);
       const me = await axios.get('/api/me/library-status');
       setStatus(me.data);
-      // fetch available books (exclude deleted)
       const books = await axios.get('/api/books');
       setAvailable(books.data.filter((b: any) => !b.isDeleted));
       if (me.data.preferences?.hasSubmitted) {
@@ -31,7 +29,7 @@ export default function PreferencesForm() {
       setSelected(selected.filter(s => s !== id));
       return;
     }
-    if (selected.length >= max) return; // enforce
+    if (selected.length >= max) return;
     setSelected([...selected, id]);
   };
 
@@ -71,7 +69,6 @@ export default function PreferencesForm() {
     );
   }
 
-  // selection UI
   return (
     <div>
       <p>You can select up to {max} books. Selected: {selected.length}</p>

@@ -29,13 +29,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
     const checkAuth = async () => {
       try {
         const userData = await authAPI.getCurrentUser();
         setUser(userData);
       } catch (error) {
-        // Not authenticated
         setUser(null);
       } finally {
         setLoading(false);
@@ -79,4 +77,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

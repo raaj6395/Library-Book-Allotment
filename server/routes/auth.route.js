@@ -4,7 +4,6 @@ import User from '../models/User.model.js';
 
 const router = express.Router();
 
-// Login
 router.post('/login',
   [
     body('email').isEmail().normalizeEmail(),
@@ -47,7 +46,6 @@ router.post('/login',
   }
 );
 
-// Get current user (requires email and password in headers)
 router.get('/me', async (req, res) => {
   try {
     const email = req.headers['x-user-email'];
@@ -80,4 +78,3 @@ router.get('/me', async (req, res) => {
 });
 
 export default router;
-
