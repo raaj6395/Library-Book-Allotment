@@ -2,6 +2,8 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import User from '../models/User.js';
+import Student from '../models/Student.js';
+import { addEmailToQueue } from '../emailWorker/emailService.js';
 import crypto from 'crypto';
 
 const router = express.Router();
@@ -31,17 +33,12 @@ router.get('/:id', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Create user (Admin only)
+// Create user (Admin only) — looks up student by registration number
 router.post('/',
   authenticate,
   requireAdmin,
   [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
-    body('registrationNumber').trim().notEmpty().withMessage('Registration number is required'),
-    body('course').optional().trim(),
-    body('batch').optional().trim(),
-    body('specialization').optional().trim()
+    body('registration_number').trim().notEmpty().withMessage('Registration number is required'),
   ],
   async (req, res) => {
     try {
@@ -50,49 +47,56 @@ router.post('/',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { name, email, registrationNumber, course, batch, specialization } = req.body;
+      const { registration_number } = req.body;
 
-      // Check if email already exists
-      const existingEmail = await User.findOne({ email });
-      if (existingEmail) {
-        return res.status(400).json({ error: 'User with this email already exists' });
+      // Look up student
+      const student = await Student.findOne({ registrationNumber: registration_number });
+      if (!student) {
+        return res.status(404).json({ error: 'No student found with this registration number' });
       }
 
-      // Check if registration number already exists
-      const existingReg = await User.findOne({ registrationNumber });
-      if (existingReg) {
-        return res.status(400).json({ error: 'User with this registration number already exists' });
+      // Check if user already exists for this student
+      const existingUser = await User.findOne({ registrationNumber: registration_number });
+      if (existingUser) {
+        return res.status(409).json({ error: 'User already exists for this student' });
       }
 
-      // Generate random password
-      const tempPassword = crypto.randomBytes(8).toString('hex');
+      // Generate secure 10-char alphanumeric password
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const tempPassword = Array.from(crypto.randomBytes(10))
+        .map(b => chars[b % chars.length])
+        .join('');
 
       const user = new User({
-        name,
-        email,
-        registrationNumber,
+        name: student.name,
+        email: student.email,
+        registrationNumber: student.registrationNumber,
         password: tempPassword,
         role: 'user',
-        course: course || '',
-        batch: batch || '',
-        specialization: specialization || ''
+        course: student.course || '',
+        batch: student.batch || '',
+        branch: student.branch || '',
+        cpi: student.cpi,
       });
 
       await user.save();
 
-      // Return user with temporary password (for printing)
+      // Send credentials email (fire-and-forget)
+      await addEmailToQueue({
+        sendToEmail: student.email,
+        title: 'Your Library System Credentials',
+        subject: `<p>Hello ${student.name},</p>
+<p>Your account has been created for the Library Book Allotment System.</p>
+<p><strong>Email:</strong> ${student.email}<br>
+<strong>Password:</strong> ${tempPassword}</p>
+<p>Please log in and change your password after first login.</p>`,
+      });
+
       const userResponse = user.toObject();
       delete userResponse.password;
-      res.status(201).json({
-        ...userResponse,
-        tempPassword // Include temp password for printing
-      });
+      res.status(201).json({ ...userResponse, tempPassword });
     } catch (error) {
       console.error('Error creating user:', error);
-      if (error.code === 11000) {
-        const field = Object.keys(error.keyPattern)[0];
-        return res.status(400).json({ error: `User with this ${field} already exists` });
-      }
       res.status(500).json({ error: 'Server error' });
     }
   }

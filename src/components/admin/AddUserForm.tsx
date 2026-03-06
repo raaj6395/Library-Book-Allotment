@@ -6,57 +6,40 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Printer } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Plus } from 'lucide-react';
 import UserCredentialsPrint from './UserCredentialsPrint';
 
-interface UserFormData {
-  name: string;
-  email: string;
-  registrationNumber: string;
-  course: string;
-  batch: string;
-  specialization: string;
-  cpi: number | null; // added
+interface FormData {
+  registration_number: string;
 }
 
 export default function AddUserForm() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState<any>(null);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<UserFormData>({
-    defaultValues: {
-      course: '',
-      batch: '',
-      specialization: '',
-      cpi: null,
-    },
-  });
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>();
 
-  const onSubmit = async (data: UserFormData) => {
+  const onSubmit = async (data: FormData) => {
     setLoading(true);
+    setInlineError(null);
     try {
-      // ensure cpi is sent as number
-      const payload = { ...data, cpi: Number(data.cpi) };
-      const user = await usersAPI.create(payload);
+      const user = await usersAPI.create({ registration_number: data.registration_number });
       setCreatedUser(user);
-      toast({
-        title: 'Success',
-        description: 'User created successfully!',
-      });
+      toast({ title: 'Success', description: 'User created successfully!' });
       reset();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to create user',
-        variant: 'destructive',
-      });
+      const msg: string = error.message || 'Failed to create user';
+      // Show 404 / 409 inline; other errors via toast
+      if (msg.includes('No student found') || msg.includes('User already exists')) {
+        setInlineError(msg);
+      } else {
+        toast({ title: 'Error', description: msg, variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   return (
@@ -64,100 +47,30 @@ export default function AddUserForm() {
       <Card>
         <CardHeader>
           <CardTitle>Add New User</CardTitle>
-          <CardDescription>Create a new user account with auto-generated password</CardDescription>
+          <CardDescription>
+            Enter a student's registration number to create their account
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  {...register('name', { required: 'Name is required' })}
-                  placeholder="John Doe"
-                />
-                {errors.name && (
-                  <p className="text-sm text-destructive">{errors.name.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...register('email', {
-                    required: 'Email is required',
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: 'Invalid email address',
-                    },
-                  })}
-                  placeholder="john.doe@student.com"
-                />
-                {errors.email && (
-                  <p className="text-sm text-destructive">{errors.email.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="registrationNumber">Registration Number *</Label>
-                <Input
-                  id="registrationNumber"
-                  {...register('registrationNumber', { required: 'Registration number is required' })}
-                  placeholder="STU001"
-                />
-                {errors.registrationNumber && (
-                  <p className="text-sm text-destructive">{errors.registrationNumber.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="course">Course</Label>
-                <Input
-                  id="course"
-                  {...register('course')}
-                  placeholder="Computer Science"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="batch">Batch</Label>
-                <Input
-                  id="batch"
-                  {...register('batch')}
-                  placeholder="2024"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="specialization">Specialization</Label>
-                <Input
-                  id="specialization"
-                  {...register('specialization')}
-                  placeholder="Software Engineering"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cpi">CPI *</Label>
-                <Input
-                  id="cpi"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  max={10}
-                  {...register('cpi', {
-                    required: 'CPI is required',
-                    valueAsNumber: true,
-                    min: { value: 0, message: 'CPI must be at least 0' },
-                    max: { value: 10, message: 'CPI cannot exceed 10' },
-                  })}
-                  placeholder="8.5"
-                />
-                {errors.cpi && <p className="text-sm text-destructive">{errors.cpi.message}</p>}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="registration_number">Registration Number</Label>
+              <Input
+                id="registration_number"
+                {...register('registration_number', { required: 'Registration number is required' })}
+                placeholder="e.g. STU2024001"
+                className="max-w-sm"
+              />
+              {errors.registration_number && (
+                <p className="text-sm text-destructive">{errors.registration_number.message}</p>
+              )}
             </div>
+
+            {inlineError && (
+              <Alert variant="destructive" className="max-w-sm">
+                <AlertDescription>{inlineError}</AlertDescription>
+              </Alert>
+            )}
 
             <Button type="submit" disabled={loading}>
               {loading ? (
@@ -182,4 +95,3 @@ export default function AddUserForm() {
     </div>
   );
 }
-
