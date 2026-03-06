@@ -37,9 +37,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  specialization: {
+  branch: {
     type: String,
     trim: true
+  },
+  cpi: {
+    type: Number,
+    min: 0,
+    max: 10
   },
   createdAt: {
     type: Date,
