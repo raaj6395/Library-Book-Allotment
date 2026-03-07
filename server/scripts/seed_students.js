@@ -1,7 +1,6 @@
-import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { read, utils } from 'xlsx';
+import ExcelJS from 'exceljs';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
@@ -18,9 +17,27 @@ const seedStudents = async () => {
     console.log('Connected to MongoDB');
 
     const filePath = join(__dirname, '../seed_data/student_data.xlsx');
-    const wb = read(readFileSync(filePath));
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = utils.sheet_to_json(ws);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.worksheets[0];
+
+    const rows = [];
+    let headers = [];
+    worksheet.eachRow((row, rowNumber) => {
+      const values = row.values || [];
+      if (rowNumber === 1) {
+        headers = values.slice(1).map((h) => (h == null ? '' : String(h).trim()));
+        return;
+      }
+      if (headers.length === 0) return;
+      const obj = {};
+      for (let i = 0; i < headers.length; i++) {
+        const key = headers[i];
+        const cell = values[i + 1];
+        obj[key] = cell;
+      }
+      rows.push(obj);
+    });
 
     if (!rows.length) {
       console.error('No data found in xlsx file');
