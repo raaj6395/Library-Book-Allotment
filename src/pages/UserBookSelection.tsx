@@ -93,21 +93,21 @@ export default function UserBookSelection() {
       setMyAllocation(allocationData);
 
       if (preferencesData?.rankedBookIds) {
-  setSelectedBooks(
-    preferencesData.rankedBookIds.map((b: any) => b._id)
-  );
+        setSelectedBooks(
+          preferencesData.rankedBookIds.map((b: any) => b._id)
+        );
 
-  setSelectedBookDetails(preferencesData.rankedBookIds);
+        setSelectedBookDetails(preferencesData.rankedBookIds);
 
-  // add books from preferences into map
-  setSelectedBookMap(prev => {
-    const updated = { ...prev };
-    preferencesData.rankedBookIds.forEach((b: any) => {
-      if (b?._id) updated[b._id] = b;
-    });
-    return updated;
-  });
-}
+        // add books from preferences into map
+        setSelectedBookMap(prev => {
+          const updated = { ...prev };
+          preferencesData.rankedBookIds.forEach((b: any) => {
+            if (b?._id) updated[b._id] = b;
+          });
+          return updated;
+        });
+      }
 
     } catch (error) {
       toast({
@@ -229,16 +229,40 @@ export default function UserBookSelection() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">Select Books</h1>
-            <p className="text-sm text-muted-foreground">Welcome, {user?.name}</p>
+
+      <header className="border-b bg-white">
+        <div className="container mx-auto px-4 h-24 flex items-center justify-between">
+
+          {/* Left side */}
+          <div className="flex items-center gap-3">
+            <img
+              src="/mnnit-logo.png"
+              alt="MNNIT Logo"
+              className="h-16 w-auto"
+            />
+
+            <div className="leading-tight">
+              <h1 className="text-xl font-semibold">
+                Central Library - Book Allotment System
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                MNNIT Allahabad
+              </p>
+            </div>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+
+          {/* Right side */}
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              Welcome, {user?.name}
+            </span>
+
+            <Button size="sm" variant="outline" onClick={handleLogout}>
+              <LogOut className="mr-1 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
+
         </div>
       </header>
 
@@ -462,6 +486,9 @@ export default function UserBookSelection() {
           </CardContent>
         </Card>
       </main>
+      <footer className="border-t mt-10 py-4 text-center text-sm text-muted-foreground">
+        © {new Date().getFullYear()} Central Library – MNNIT Allahabad
+      </footer>
     </div>
   );
 }
