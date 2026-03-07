@@ -45,6 +45,20 @@ export default function UserBookSelection() {
   const [myAllocation, setMyAllocation] = useState<any>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
+  //for search bar
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredBooks = books.filter((book) => {
+    const query = searchTerm.toLowerCase();
+
+    return (
+      book.title?.toLowerCase().includes(query) ||
+      book.author?.toLowerCase().includes(query) ||
+      book.category?.toLowerCase().includes(query) ||
+      book.isbnOrBookId?.toLowerCase().includes(query)
+    );
+  });
+
   useEffect(() => {
     loadData();
   }, []);
@@ -245,6 +259,13 @@ export default function UserBookSelection() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <input
+              type="text"
+              placeholder="Search by title, author, category or book ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full p-2 border rounded-md mb-2"
+            />
             <div className="space-y-4">
               {myPreferences && (
                 <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-md p-3 text-sm font-medium">
