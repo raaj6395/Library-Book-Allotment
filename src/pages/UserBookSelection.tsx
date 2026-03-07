@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, LogOut, BookOpen, CheckCircle2 } from 'lucide-react';
+import { Loader2, LogOut, BookOpen, CheckCircle2, AlertTriangle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,6 +15,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface Book {
   _id: string;
@@ -35,6 +43,7 @@ export default function UserBookSelection() {
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
   const [myPreferences, setMyPreferences] = useState<any>(null);
   const [myAllocation, setMyAllocation] = useState<any>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -80,6 +89,45 @@ export default function UserBookSelection() {
     }
   };
 
+  //----for interactive ui alert
+  const confirmSubmitPreferences = async () => {
+    setShowConfirmDialog(false);
+    setSubmitting(true);
+
+    try {
+      await preferencesAPI.submitPreferences(selectedBooks);
+
+      toast({
+        title: "Success",
+        description: "Your book preferences have been submitted!",
+      });
+
+      await loadData();
+    } catch (error: any) {
+      if (error.message?.includes("Preferences already submitted")) { //for extra safety
+        toast({
+          title: "Preferences Already Submitted",
+          description: "Your preference has already been filled and cannot be updated.",
+          variant: "destructive",
+        });
+        // Reset selections back to saved preferences
+        if (myPreferences?.rankedBookIds) {
+          setSelectedBooks(
+            myPreferences.rankedBookIds.map((b: any) => b._id || b)
+          );
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to submit preferences",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmitPreferences = async () => {
     if (selectedBooks.length === 0) {
       toast({
@@ -90,23 +138,32 @@ export default function UserBookSelection() {
       return;
     }
 
-    setSubmitting(true);
-    try {
-      await preferencesAPI.submitPreferences(selectedBooks);
-      toast({
-        title: 'Success',
-        description: 'Your book preferences have been submitted!',
-      });
-      await loadData();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to submit preferences',
-        variant: 'destructive',
-      });
-    } finally {
-      setSubmitting(false);
-    }
+    //----------for a basic alert window-------
+    // const confirmSubmit = window.confirm(
+    //   "Your preferences have been saved and cannot be changed. Please ensure your selections are correct before submitting."
+    // );
+
+    // if (!confirmSubmit) return;
+
+    setShowConfirmDialog(true);
+
+    // setSubmitting(true);
+    // try {
+    //   await preferencesAPI.submitPreferences(selectedBooks);
+    //   toast({
+    //     title: 'Success',
+    //     description: 'Your book preferences have been submitted!',
+    //   });
+    //   await loadData();
+    // } catch (error: any) {
+    //   toast({
+    //     title: 'Error',
+    //     description: error.message || 'Failed to submit preferences',
+    //     variant: 'destructive',
+    //   });
+    // } finally {
+    //   setSubmitting(false);
+    // }
   };
 
   const handleLogout = () => {
@@ -189,6 +246,12 @@ export default function UserBookSelection() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {myPreferences && (
+                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-md p-3 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4" />
+                  Preferences already submitted. You cannot modify them.
+                </div>
+              )}
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -215,6 +278,7 @@ export default function UserBookSelection() {
                             <input
                               type="checkbox"
                               checked={isSelected}
+                              disabled={!!myPreferences}
                               onChange={() => toggleBookSelection(book._id)}
                               className="h-4 w-4"
                             />
@@ -272,6 +336,44 @@ export default function UserBookSelection() {
                   </>
                 )}
               </Button>
+              <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-red-600">
+                      ⚠ Confirm Submission
+                    </DialogTitle>
+                    <DialogDescription>
+                      Please review your selections before submitting.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {/* Warning box */}
+                  <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
+                    <p className="font-semibold mb-1">Important Notice</p>
+                    <p>
+                      Your preferences will be permanently saved and <strong>cannot be changed later</strong>.
+                      Please ensure your selections are correct before proceeding.
+                    </p>
+                  </div>
+
+                  <DialogFooter className="gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowConfirmDialog(false)}
+                    >
+                      Cancel
+                    </Button>
+
+                    <Button
+                      onClick={confirmSubmitPreferences}
+                      disabled={submitting}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      I Understand & Submit
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>

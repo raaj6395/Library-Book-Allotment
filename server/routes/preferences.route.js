@@ -44,8 +44,9 @@ router.post('/',
       let preference = await Preference.findOne({ userId: req.user.id });
 
       if (preference) {
-        preference.rankedBookIds = rankedBookIds;
-        preference.submittedAt = new Date();
+        return res.status(409).json({
+          error: 'Preferences already submitted and cannot be updated'
+        });
       } else {
         preference = new Preference({
           userId: req.user.id,
