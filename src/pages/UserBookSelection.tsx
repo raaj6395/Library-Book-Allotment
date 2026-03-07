@@ -287,7 +287,7 @@ export default function UserBookSelection() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {books.map((book) => {
+                    {filteredBooks.map((book) => {
                       const isSelected = selectedBooks.includes(book._id);
                       const priority = isSelected ? selectedBooks.indexOf(book._id) + 1 : null;
                       return (
