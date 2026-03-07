@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, LogOut, BookOpen, CheckCircle2 } from 'lucide-react';
+import { Loader2, LogOut, BookOpen, CheckCircle2, AlertTriangle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -104,11 +104,25 @@ export default function UserBookSelection() {
 
       await loadData();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit preferences",
-        variant: "destructive",
-      });
+      if (error.message?.includes("Preferences already submitted")) { //for extra safety
+        toast({
+          title: "Preferences Already Submitted",
+          description: "Your preference has already been filled and cannot be updated.",
+          variant: "destructive",
+        });
+        // Reset selections back to saved preferences
+        if (myPreferences?.rankedBookIds) {
+          setSelectedBooks(
+            myPreferences.rankedBookIds.map((b: any) => b._id || b)
+          );
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to submit preferences",
+          variant: "destructive",
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -232,6 +246,12 @@ export default function UserBookSelection() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {myPreferences && (
+                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-md p-3 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4" />
+                  Preferences already submitted. You cannot modify them.
+                </div>
+              )}
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -258,6 +278,7 @@ export default function UserBookSelection() {
                             <input
                               type="checkbox"
                               checked={isSelected}
+                              disabled={!!myPreferences}
                               onChange={() => toggleBookSelection(book._id)}
                               className="h-4 w-4"
                             />
