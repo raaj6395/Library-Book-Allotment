@@ -277,8 +277,21 @@ export default function AddBookForm() {
                     <td>{b.author || '-'}</td>
                     <td>{new Date(b.createdAt).toLocaleString()}</td>
                     <td className="text-right">
-                      <Button variant="destructive" size="sm" onClick={() => handleDelete(b._id)} disabled={deleting === b._id}>
-                        {deleting === b._id ? 'Deleting...' : <><Trash className="mr-2 h-4 w-4" />Delete</>}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="px-2 flex items-center gap-1 ml-auto"
+                        onClick={() => handleDelete(b._id)}
+                        disabled={deleting === b._id}
+                      >
+                        {deleting === b._id ? (
+                          'Deleting...'
+                        ) : (
+                          <>
+                            <Trash className="h-4 w-4" />
+                            <span className="hidden sm:inline">Delete</span>
+                          </>
+                        )}
                       </Button>
                     </td>
                   </tr>

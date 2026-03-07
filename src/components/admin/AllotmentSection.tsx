@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import { allotmentAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Download, Loader2, Play, RefreshCw } from 'lucide-react';
 import {
   Table,
@@ -36,9 +42,12 @@ export default function AllotmentSection() {
   };
 
   const handleRunAllotment = async () => {
-    if (!confirm('Are you sure you want to run the allotment? This will assign books based on user preferences.')) {
+    if (
+      !confirm(
+        'Are you sure you want to run the allotment? This will assign books based on user preferences.'
+      )
+    )
       return;
-    }
 
     setLoading(true);
     try {
@@ -46,6 +55,7 @@ export default function AllotmentSection() {
       setResults(data);
       setSelectedEventId(data.eventId);
       await loadEvents();
+
       toast({
         title: 'Success',
         description: `Allotment completed! ${data.totalAllocations} books allotted, ${data.totalWaitlists} waitlisted.`,
@@ -77,7 +87,9 @@ export default function AllotmentSection() {
 
   const handleDownloadReport = async () => {
     if (!selectedEventId) return;
+
     setDownloading(true);
+
     try {
       await allotmentAPI.downloadReport(selectedEventId);
     } catch (error: any) {
@@ -93,15 +105,23 @@ export default function AllotmentSection() {
 
   return (
     <div className="space-y-6">
+
+      {/* Run Allotment */}
       <Card>
         <CardHeader>
           <CardTitle>Run Allotment Event</CardTitle>
           <CardDescription>
-            Assign books to users based on their submitted preferences (first-come-first-serve)
+            Assign books to users based on their submitted preferences
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button onClick={handleRunAllotment} disabled={loading} size="lg">
+
+        <CardContent className="flex justify-center sm:justify-start">
+          <Button
+            onClick={handleRunAllotment}
+            disabled={loading}
+            size="lg"
+            className="w-full sm:w-auto"
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -117,99 +137,141 @@ export default function AllotmentSection() {
         </CardContent>
       </Card>
 
+      {/* Previous Events */}
       {events.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Previous Allotment Events</CardTitle>
-            <CardDescription>Click on an event to view results</CardDescription>
+            <CardDescription>
+              Click on an event to view results
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {events.map((event) => (
-                <div
-                  key={event._id}
-                  className="flex justify-between items-center p-3 border rounded-lg hover:bg-muted cursor-pointer"
-                  onClick={() => loadResults(event._id)}
-                >
-                  <div>
-                    <p className="font-medium">
-                      Event on {new Date(event.runAt).toLocaleString()}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Run by {event.runByAdminId?.name || 'Admin'}
-                    </p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    View Results
-                  </Button>
+
+          <CardContent className="space-y-3">
+
+            {events.map((event) => (
+              <div
+                key={event._id}
+                onClick={() => loadResults(event._id)}
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg hover:bg-muted cursor-pointer"
+              >
+                <div>
+                  <p className="font-medium text-sm sm:text-base">
+                    Event on {new Date(event.runAt).toLocaleString()}
+                  </p>
+
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Run by {event.runByAdminId?.name || 'Admin'}
+                  </p>
                 </div>
-              ))}
-            </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                >
+                  View Results
+                </Button>
+              </div>
+            ))}
+
           </CardContent>
         </Card>
       )}
 
+      {/* Results */}
       {results && results.results && (
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
               <div>
                 <CardTitle>Allotment Results</CardTitle>
                 <CardDescription>
                   {results.totalAllocations} allotted, {results.totalWaitlists} waitlisted
                 </CardDescription>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleDownloadReport} disabled={downloading}>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadReport}
+                  disabled={downloading}
+                  className="w-full sm:w-auto"
+                >
                   {downloading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Download className="mr-2 h-4 w-4" />
                   )}
-                  Download Report
+                  Download
                 </Button>
-                <Button variant="outline" onClick={() => setResults(null)}>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setResults(null)}
+                  className="w-full sm:w-auto"
+                >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Close
                 </Button>
+
+              </div>
+
+            </div>
+
+          </CardHeader>
+
+          <CardContent>
+
+            {/* Responsive Table */}
+            <div className="w-full overflow-x-auto">
+              <div className="min-w-[650px]">
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Registration</TableHead>
+                      <TableHead>Book</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {results.results.map((result: any) => (
+                      <TableRow key={result._id}>
+                        <TableCell>{result.userId?.name}</TableCell>
+                        <TableCell>{result.userId?.registrationNumber}</TableCell>
+                        <TableCell>{result.bookId?.title}</TableCell>
+                        <TableCell>{result.bookId?.author}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              result.status === 'allotted'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
+                            {result.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+
+                </Table>
+
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Registration</TableHead>
-                    <TableHead>Book</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {results.results.map((result: any) => (
-                    <TableRow key={result._id}>
-                      <TableCell>{result.userId?.name}</TableCell>
-                      <TableCell>{result.userId?.registrationNumber}</TableCell>
-                      <TableCell>{result.bookId?.title}</TableCell>
-                      <TableCell>{result.bookId?.author}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={result.status === 'allotted' ? 'default' : 'secondary'}
-                        >
-                          {result.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+
           </CardContent>
         </Card>
       )}
+
     </div>
   );
 }
-

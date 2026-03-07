@@ -125,3 +125,27 @@
       inset -1px 0 4px -2px hsl(var(--wood) / 0.1);
   }
 }
+
+
+@media print {
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  @page {
+    margin: 20mm;
+  }
+}
