@@ -47,35 +47,68 @@ export default function UserBookSelection() {
 
   //for search bar
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [total, setTotal] = useState(1);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [selectedBookDetails, setSelectedBookDetails] = useState<any[]>([]);
+  const [selectedBookMap, setSelectedBookMap] = useState<Record<string, Book>>({});
 
-  const filteredBooks = books.filter((book) => {
-    const query = searchTerm.toLowerCase();
+  const limit = 15;
+  const totalPages = Math.ceil(total / limit);
 
-    return (
-      book.title?.toLowerCase().includes(query) ||
-      book.author?.toLowerCase().includes(query) ||
-      book.category?.toLowerCase().includes(query) ||
-      book.isbnOrBookId?.toLowerCase().includes(query)
-    );
-  });
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [debouncedSearch, currentPage]);
 
   const loadData = async () => {
     try {
-      const [booksData, preferencesData, allocationData] = await Promise.all([
-        booksAPI.getAll(),
+      setTableLoading(true);
+      const [booksRes, preferencesData, allocationData] = await Promise.all([
+        booksAPI.getAll({
+          search: debouncedSearch,
+          page: currentPage,
+          limit
+        }),
         preferencesAPI.getMyPreferences().catch(() => null),
         allotmentAPI.getMyAllocation().catch(() => null),
       ]);
-      setBooks(booksData);
+
+      setBooks(booksRes.items || []);
+      setSelectedBookMap(prev => {
+        const updated = { ...prev };
+        (booksRes.items || []).forEach((b: Book) => {
+          updated[b._id] = b;
+        });
+        return updated;
+      });
+      setTotal(booksRes.total || 1);
+
       setMyPreferences(preferencesData);
       setMyAllocation(allocationData);
+
       if (preferencesData?.rankedBookIds) {
-        setSelectedBooks(preferencesData.rankedBookIds.map((b: any) => b._id || b));
-      }
+  setSelectedBooks(
+    preferencesData.rankedBookIds.map((b: any) => b._id)
+  );
+
+  setSelectedBookDetails(preferencesData.rankedBookIds);
+
+  // add books from preferences into map
+  setSelectedBookMap(prev => {
+    const updated = { ...prev };
+    preferencesData.rankedBookIds.forEach((b: any) => {
+      if (b?._id) updated[b._id] = b;
+    });
+    return updated;
+  });
+}
+
     } catch (error) {
       toast({
         title: 'Error',
@@ -84,6 +117,7 @@ export default function UserBookSelection() {
       });
     } finally {
       setLoading(false);
+      setTableLoading(false);
     }
   };
 
@@ -263,7 +297,10 @@ export default function UserBookSelection() {
               type="text"
               placeholder="Search by title, author, category or book ID..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full p-2 border rounded-md mb-2"
             />
             <div className="space-y-4">
@@ -273,7 +310,7 @@ export default function UserBookSelection() {
                   Preferences already submitted. You cannot modify them.
                 </div>
               )}
-              <div className="rounded-md border">
+              <div className="relative rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -287,7 +324,7 @@ export default function UserBookSelection() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredBooks.map((book) => {
+                    {books.map((book) => {
                       const isSelected = selectedBooks.includes(book._id);
                       const priority = isSelected ? selectedBooks.indexOf(book._id) + 1 : null;
                       return (
@@ -321,6 +358,32 @@ export default function UserBookSelection() {
                     })}
                   </TableBody>
                 </Table>
+                {tableLoading && (
+                  <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-center gap-4 mt-4">
+                <Button
+                  variant="outline"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+
+                <span className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <Button
+                  variant="outline"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
               </div>
 
               {selectedBooks.length > 0 && (
@@ -328,7 +391,7 @@ export default function UserBookSelection() {
                   <p className="font-semibold mb-2">Your Selection ({selectedBooks.length}/10):</p>
                   <ol className="list-decimal list-inside space-y-1">
                     {selectedBooks.map((bookId, index) => {
-                      const book = books.find(b => b._id === bookId);
+                      const book = selectedBookMap[bookId];
                       return (
                         <li key={bookId}>
                           {book ? `${book.title} by ${book.author}` : 'Loading...'}

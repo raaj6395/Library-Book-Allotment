@@ -5,7 +5,7 @@ import { read, utils } from 'xlsx';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
-import Student from '../models/Student.js';
+import Student from '../models/Student.model.js';
 
 dotenv.config();
 
