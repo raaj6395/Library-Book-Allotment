@@ -30,6 +30,11 @@ export default function AddBookForm() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const limit = 15;
+  const [total, setTotal] = useState(1);
+  const totalPages = Math.ceil(total / limit);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<BookFormData>({
     defaultValues: {
@@ -48,9 +53,19 @@ export default function AddBookForm() {
     setListLoading(true);
     setListError(null);
     try {
-      const res = await adminBooksAPI.list({ search: debouncedSearch, page: 1, limit: 100 });
-      const items = Array.isArray(res) ? res : (res.items || []);
+      const res = await adminBooksAPI.list({
+        search: debouncedSearch,
+        page: currentPage,
+        limit
+      });
+
+      const items = res.items || [];
       setBooks(items);
+      setTotal(res.total || 1);
+      const newTotalPages = Math.ceil((res.total || 1) / limit);
+      if (currentPage > newTotalPages) {
+        setCurrentPage(newTotalPages);
+      }
     } catch (err: any) {
       setListError(err?.message || 'Failed to load books');
     } finally {
@@ -60,7 +75,7 @@ export default function AddBookForm() {
 
   useEffect(() => {
     fetchList();
-  }, [debouncedSearch]);
+  }, [debouncedSearch, currentPage]);
 
   const onSubmit = async (data: BookFormData) => {
     setLoading(true);
@@ -220,20 +235,24 @@ export default function AddBookForm() {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-md font-medium">All Books</h3>
-          <Input placeholder="Search by title or author" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
+          <Input placeholder="Search by title or author" value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }} className="w-64" />
         </div>
 
         <div className="relative">
           {listError && (
             <div className="p-4 text-destructive">{listError}</div>
           )}
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr>
-                <th className="text-left">Title</th>
-                <th className="text-left">Author</th>
-                <th className="text-left">Created</th>
-                <th className="text-right">Actions</th>
+                <th className="text-left w-[40%]">Title</th>
+                <th className="text-left w-[25%]">Author</th>
+                <th className="text-left w-[20%]">Created</th>
+                <th className="text-right w-[15%]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -252,7 +271,9 @@ export default function AddBookForm() {
               ) : (
                 books.map((b) => (
                   <tr key={b._id} className="border-t">
-                    <td>{b.title}</td>
+                    <td className="truncate max-w-[300px]" title={b.title}>
+                      {b.title}
+                    </td>
                     <td>{b.author || '-'}</td>
                     <td>{new Date(b.createdAt).toLocaleString()}</td>
                     <td className="text-right">
@@ -265,6 +286,27 @@ export default function AddBookForm() {
               )}
             </tbody>
           </table>
+          <div className="flex items-center justify-center gap-4 mt-4">
+            <Button
+              variant="outline"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              Previous
+            </Button>
+
+            <span className="text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <Button
+              variant="outline"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
           {listLoading && books.length > 0 && (
             <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center">
               <div className="text-sm text-muted-foreground">Updating...</div>

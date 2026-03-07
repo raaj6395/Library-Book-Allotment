@@ -57,7 +57,17 @@ export const authAPI = {
 };
 
 export const booksAPI = {
-  getAll: () => apiRequest("/books"),
+  getAll: async (opts: { search?: string; page?: number; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+
+    if (opts.search) params.append("search", opts.search);
+    if (opts.page) params.append("page", String(opts.page));
+    if (opts.limit) params.append("limit", String(opts.limit));
+
+    const query = params.toString() ? `?${params.toString()}` : "";
+
+    return apiRequest(`/books${query}`);
+  },
   getById: (id: string) => apiRequest(`/books/${id}`),
   create: (book: any) =>
     apiRequest("/books", {
