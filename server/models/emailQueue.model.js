@@ -12,6 +12,7 @@ const emailQueueSchema = new mongoose.Schema(
     },
     attempts: { type: Number, default: 0 },
     error: { type: String },
+    nextRetryAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
