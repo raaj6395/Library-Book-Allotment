@@ -1,61 +1,95 @@
 import EmailQueue from '../models/emailQueue.model.js';
-import getTransporter from './nodemailerTransport.js';
+import { getEmailTransporter, isEmailAvailable } from '../config/emailService.js';
+import { logger } from '../utils/logger.js';
+import { setServiceStatus } from '../utils/serviceRegistry.js';
 
-const MAX_ATTEMPTS = 3;
-const POLL_INTERVAL_MS = 5000;
+const MAX_ATTEMPTS        = 3;
+const POLL_INTERVAL_MS    = 5_000;
+const BASE_RETRY_DELAY_MS = 30_000; // 30 s → 60 s → 120 s
+
+/**
+ * Returns when a failed job should next be retried (exponential backoff).
+ * Exported for unit testing.
+ *
+ * @param {number} attempts – number of attempts already made
+ * @returns {Date}
+ */
+export function getNextRetryAt(attempts) {
+  const delayMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempts - 1);
+  return new Date(Date.now() + delayMs);
+}
 
 async function processNextJob() {
+  if (!isEmailAvailable()) return;
+
+  const now = new Date();
+
+  // Only pick up jobs whose retry window has elapsed
   const job = await EmailQueue.findOneAndUpdate(
-    { status: 'pending' },
+    {
+      status: 'pending',
+      $or: [{ nextRetryAt: null }, { nextRetryAt: { $lte: now } }],
+    },
     { $set: { status: 'processing' } },
-    { new: true }
+    { new: true },
   );
 
   if (!job) return;
 
   try {
-    const transporter = getTransporter();
+    const transporter = getEmailTransporter();
     await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: job.sendToEmail,
+      from:    process.env.GMAIL_USER,
+      to:      job.sendToEmail,
       subject: job.title,
-      html: job.subject,
+      html:    job.subject,
     });
 
-    job.status = 'done';
+    job.status      = 'done';
+    job.nextRetryAt = null;
     await job.save();
-    console.log(`✅ Email sent to ${job.sendToEmail} [id: ${job._id}]`);
+
+    logger.info(`[EMAIL WORKER] Sent to ${job.sendToEmail}`, { jobId: String(job._id) });
   } catch (err) {
     job.attempts += 1;
+    job.error = err.message;
 
     if (job.attempts >= MAX_ATTEMPTS) {
       job.status = 'failed';
-      job.error = err.message;
-      console.error(`❌ Email permanently failed for ${job.sendToEmail} [id: ${job._id}]`);
-      console.error(`   Reason: ${err.message}`);
-      console.error(`   GMAIL_USER: ${process.env.GMAIL_USER ?? 'NOT SET'}`);
-      console.error(`   GMAIL_APP_PASSWORD: ${process.env.GMAIL_APP_PASSWORD ? '***set***' : 'NOT SET'}`);
+      logger.error(`[EMAIL WORKER] Permanently failed for ${job.sendToEmail}`, {
+        jobId:    String(job._id),
+        attempts: job.attempts,
+        error:    err.message,
+      });
     } else {
-      job.status = 'pending';
-      console.warn(`⚠️  Email failed (attempt ${job.attempts}/${MAX_ATTEMPTS}) for ${job.sendToEmail}`);
-      console.warn(`   Reason: ${err.message}`);
+      job.status      = 'pending';
+      job.nextRetryAt = getNextRetryAt(job.attempts);
+      logger.warn(`[EMAIL WORKER] Send failed — will retry`, {
+        jobId:       String(job._id),
+        attempt:     job.attempts,
+        maxAttempts: MAX_ATTEMPTS,
+        nextRetryAt: job.nextRetryAt.toISOString(),
+        error:       err.message,
+      });
     }
 
     await job.save();
   }
 }
 
-export function startEmailWorker() {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-
-  if (!user || !pass) {
-    console.error('❌ Email worker: missing credentials — emails will fail!');
-    console.error(`   GMAIL_USER: ${user ?? 'NOT SET'}`);
-    console.error(`   GMAIL_APP_PASSWORD: ${pass ? '***set***' : 'NOT SET'}`);
-    console.error('   → Set these in your .env file and restart the server.');
+/**
+ * Starts the polling loop that drains the email queue.
+ *
+ * @param {boolean} emailAvailable – pass the result of initEmailService()
+ */
+export function startEmailWorker(emailAvailable) {
+  if (!emailAvailable) {
+    logger.warn('[EMAIL WORKER] Running in degraded mode — email sending is disabled');
+    logger.warn('[EMAIL WORKER] Set GMAIL_USER and GMAIL_APP_PASSWORD in .env to enable');
+    setServiceStatus('emailWorker', 'disabled', 'Email credentials not configured');
   } else {
-    console.log(`📧 Email worker started — sending as ${user}, polling every ${POLL_INTERVAL_MS / 1000}s`);
+    logger.info(`[EMAIL WORKER] Started — polling every ${POLL_INTERVAL_MS / 1000}s`);
+    setServiceStatus('emailWorker', 'healthy', `Polling every ${POLL_INTERVAL_MS / 1000}s`);
   }
 
   setInterval(processNextJob, POLL_INTERVAL_MS);

@@ -6,7 +6,8 @@
     "dev": "node --watch server.js",
     "start": "node server.js",
     "seed": "node scripts/seed_data.js",
-    "clear:users": "node scripts/clear_users.js"
+    "clear:users": "node scripts/clear_users.js",
+    "test": "node --test tests/healthCheck.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
