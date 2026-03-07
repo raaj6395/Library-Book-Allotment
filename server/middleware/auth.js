@@ -1,29 +1,25 @@
+import jwt from 'jsonwebtoken';
 import User from '../models/User.model.js';
 
 export const authenticate = async (req, res, next) => {
   try {
-    const email = req.headers['x-user-email'];
-    const password = req.headers['x-user-password'];
-
-    if (!email || !password) {
-      return res.status(401).json({ error: 'Email and password required' });
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader || !String(authHeader).startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization header required' });
     }
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const token = String(authHeader).split(' ')[1];
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    const user = await User.findById(payload.id);
+    if (!user) return res.status(401).json({ error: 'Invalid token user' });
 
-    req.user = {
-      id: user._id.toString(),
-      email: user.email,
-      role: user.role
-    };
+    req.user = { id: user._id.toString(), email: user.email, role: user.role };
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Authentication failed' });
@@ -36,4 +32,3 @@ export const requireAdmin = (req, res, next) => {
   }
   next();
 };
-

@@ -1,5 +1,5 @@
 import express from 'express';
-import xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import Preference from '../models/Preference.model.js';
 import Book from '../models/Book.model.js';
@@ -229,19 +229,17 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       b.availableCopies === 0 ? 'Unavailable' : 'Available',
     ]);
 
-    const wb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(
-      wb,
-      xlsx.utils.aoa_to_sheet([studentHeader, ...studentRows]),
-      'Students'
-    );
-    xlsx.utils.book_append_sheet(
-      wb,
-      xlsx.utils.aoa_to_sheet([bookHeader, ...bookRows]),
-      'Books'
-    );
+    const workbook = new ExcelJS.Workbook();
 
-    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const sheet1 = workbook.addWorksheet('Students');
+    sheet1.addRow(studentHeader);
+    for (const row of studentRows) sheet1.addRow(row);
+
+    const sheet2 = workbook.addWorksheet('Books');
+    sheet2.addRow(bookHeader);
+    for (const row of bookRows) sheet2.addRow(row);
+
+    const buffer = await workbook.xlsx.writeBuffer();
 
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
