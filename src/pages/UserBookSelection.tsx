@@ -45,6 +45,13 @@ export default function UserBookSelection() {
   const [myAllocation, setMyAllocation] = useState<any>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
+  //for search bar
+    const [searchTerm, setSearchTerm] = useState("");
+  
+    const filteredBooks = books.filter((book) =>
+      book.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
   useEffect(() => {
     loadData();
   }, []);
@@ -245,6 +252,13 @@ export default function UserBookSelection() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <input
+              type="text"
+              placeholder="Search books by title..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full p-2 border rounded-md mb-2"
+            />
             <div className="space-y-4">
               {myPreferences && (
                 <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-md p-3 text-sm font-medium">
@@ -266,7 +280,7 @@ export default function UserBookSelection() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {books.map((book) => {
+                    {filteredBooks.map((book) => {
                       const isSelected = selectedBooks.includes(book._id);
                       const priority = isSelected ? selectedBooks.indexOf(book._id) + 1 : null;
                       return (
