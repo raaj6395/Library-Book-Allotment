@@ -227,6 +227,9 @@ export default function UserBookSelection() {
     );
   }
 
+  const allotted = myAllocation?.filter((a: any) => a.status === "allotted") || [];
+  const notAllotted = myAllocation?.filter((a: any) => a.status === "not_allotted") || [];
+
   return (
     <div className="min-h-screen bg-background">
 
@@ -267,21 +270,31 @@ export default function UserBookSelection() {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
-        {myAllocation?.length > 0 && (
-          <Card className="border-green-200 bg-green-50">
+        {myAllocation && myAllocation.length > 0 && (
+          <Card className={allotted.length > 0
+            ? "border-green-200 bg-green-50"
+            : "border-red-200 bg-red-50"}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                Your Book Allocation
+                <CheckCircle2 className={`h-5 w-5 ${allotted.length > 0 ? "text-green-600" : "text-red-600"}`} />
+                {allotted.length > 0 ? "Your Book Allocation" : "No Books Allotted"}
               </CardTitle>
             </CardHeader>
+
             <CardContent>
               <ol className="list-decimal list-inside space-y-2">
                 {myAllocation.map((a: any) => (
                   <li key={a._id}>
                     <span className="font-semibold">{a.bookId?.title}</span>
                     <span className="text-muted-foreground"> by {a.bookId?.author}</span>
-                    <Badge variant="default" className="ml-2">{a.status}</Badge>
+
+                    <Badge
+                      variant={a.status === "allotted" ? "default" : "secondary"}
+                      className="ml-2"
+                    >
+                      {a.status}
+                    </Badge>
                   </li>
                 ))}
               </ol>

@@ -57,8 +57,8 @@ export default function AllotmentSection() {
       await loadEvents();
 
       toast({
-        title: 'Success',
-        description: `Allotment completed! ${data.totalAllocations} books allotted, ${data.totalWaitlists} waitlisted.`,
+        title: "Allotment Completed",
+        description: `✅ ${data.totalAllocations} allotted | ❌ ${data.totalNotAllotted} not allotted`,
       });
     } catch (error: any) {
       toast({
@@ -189,7 +189,7 @@ export default function AllotmentSection() {
               <div>
                 <CardTitle>Allotment Results</CardTitle>
                 <CardDescription>
-                  {results.totalAllocations} allotted, {results.totalWaitlists} waitlisted
+                  {results.totalAllocations} allotted, {results.totalNotAllotted} not allotted
                 </CardDescription>
               </div>
 
