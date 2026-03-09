@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, LogOut, BookOpen, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Loader2, LogOut, BookOpen, CheckCircle2, AlertTriangle, GripVertical } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -24,6 +24,25 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+import {
+  DndContext,
+  closestCenter,
+  useSensor,
+  useSensors,
+  MouseSensor,
+  TouchSensor
+} from "@dnd-kit/core";
+
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove
+} from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+
+import { CSS } from "@dnd-kit/utilities";
+
 interface Book {
   _id: string;
   title: string;
@@ -31,6 +50,67 @@ interface Book {
   isbnOrBookId: string;
   category: string;
   availableCopies: number;
+}
+
+function SortableBook({ id, book, index, removeBook }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform)
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-3 rounded-lg border bg-white shadow-sm hover:shadow-md transition ${isDragging ? "opacity-70" : ""
+        }`}
+    >
+      <div className="flex items-center gap-3">
+
+        {/* Drag icon */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab p-2 -ml-2 touch-none"
+        >
+          <GripVertical size={20} />
+        </div>
+
+        {/* Priority badge */}
+        <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm font-semibold">
+          #{index + 1}
+        </span>
+
+        {/* Book title */}
+        <span className="font-medium">
+          {book?.title}
+        </span>
+
+        <span className="text-sm text-muted-foreground">
+          by {book?.author}
+        </span>
+      </div>
+
+      {/* remove button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          removeBook(id);
+        }}
+        className="text-red-500 hover:text-red-700 text-sm"
+      >
+        Remove
+      </button>
+    </div>
+  );
 }
 
 export default function UserBookSelection() {
@@ -44,6 +124,19 @@ export default function UserBookSelection() {
   const [myPreferences, setMyPreferences] = useState<any>(null);
   const [myAllocation, setMyAllocation] = useState<any>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 1,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
 
   //for search bar
   const [searchTerm, setSearchTerm] = useState("");
@@ -174,6 +267,21 @@ export default function UserBookSelection() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = selectedBooks.indexOf(active.id);
+    const newIndex = selectedBooks.indexOf(over.id);
+
+    setSelectedBooks(arrayMove(selectedBooks, oldIndex, newIndex));
+  };
+
+  const removeBook = (bookId: string) => {
+    setSelectedBooks(prev => prev.filter(id => id !== bookId));
   };
 
   const handleSubmitPreferences = async () => {
@@ -424,24 +532,88 @@ export default function UserBookSelection() {
               </div>
 
               {selectedBooks.length > 0 && (
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <p className="font-semibold mb-2">Your Selection ({selectedBooks.length}/10):</p>
-                  <ol className="list-decimal list-inside space-y-1">
-                    {selectedBooks.map((bookId, index) => {
-                      const book = selectedBookMap[bookId];
-                      return (
-                        <li key={bookId}>
-                          {book ? `${book.title} by ${book.author}` : 'Loading...'}
-                        </li>
-                      );
-                    })}
-                  </ol>
+                <div className="mt-6 p-5 bg-slate-50 border rounded-xl">
+                  <p className="font-semibold mb-3 text-lg">
+                    Your Selection ({selectedBooks.length}/10)
+                  </p>
+
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {myPreferences
+                      ? "Your submitted preference order"
+                      : "Drag books to change their priority order"}
+                  </p>
+                  {myPreferences ? (
+                    <ol className="space-y-2">
+                      {selectedBooks.map((bookId, index) => {
+                        const book = selectedBookMap[bookId];
+                        return (
+                          <li
+                            key={bookId}
+                            className="flex items-center gap-3 p-3 border rounded-lg bg-white"
+                          >
+                            <span className="font-semibold">#{index + 1}</span>
+                            <span>{book?.title}</span>
+                            <span className="text-sm text-muted-foreground">
+                              by {book?.author}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>) : (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                      modifiers={[restrictToVerticalAxis]}
+                    >
+                      <SortableContext
+                        items={selectedBooks}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {selectedBooks.map((bookId, index) => {
+                            const book = selectedBookMap[bookId];
+
+                            return (
+                              <SortableBook
+                                key={bookId}
+                                id={bookId}
+                                index={index}
+                                book={book}
+                                removeBook={removeBook}
+                              />
+                            );
+                          })}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                  {/* <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis]}>
+                      <SortableContext items={selectedBooks} strategy={verticalListSortingStrategy}>
+                        <ol className="space-y-2">
+                          {selectedBooks.map((bookId, index) => {
+                            const book = selectedBookMap[bookId];
+
+                            return (
+                              <SortableBook
+                                key={bookId}
+                                id={bookId}
+                                index={index}
+                                book={book}
+                                removeBook={removeBook}
+                              />
+                            );
+                          })}
+                        </ol>
+                      </SortableContext>
+                    </DndContext>
+                  </ol> */}
                 </div>
               )}
 
               <Button
                 onClick={handleSubmitPreferences}
-                disabled={submitting || selectedBooks.length === 0}
+                disabled={submitting || selectedBooks.length === 0 || !!myPreferences}
                 size="lg"
                 className="w-full"
               >
