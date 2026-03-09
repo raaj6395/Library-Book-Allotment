@@ -6,6 +6,7 @@ import Book from '../models/Book.model.js';
 import Allotment from '../models/Allotment.model.js';
 import AllotmentEvent from '../models/AllotmentEvent.model.js';
 import { addEmailToQueue } from '../emailWorker/emailService.js';
+import { libraryEmailTemplate } from "../utils/emailTemplates.js";
 
 const router = express.Router();
 
@@ -14,11 +15,9 @@ const MAX_BOOKS_PER_STUDENT = 5;
 
 const COURSE_RANK = {
   'PhD': 10,
-  'M.Tech': 8,
-  'M.Sc': 7,
-  'B.Tech': 5,
-  'B.Sc': 4,
-  'Diploma': 2,
+  'M.Tech': 9,
+  'B.Tech': 8,
+  'MCA':8
 };
 
 function getCourseScore(course) {
@@ -27,16 +26,16 @@ function getCourseScore(course) {
 
 function getWeights() {
   const w1 = parseFloat(process.env.RANK_W1 ?? '0.40');
-  const w2 = parseFloat(process.env.RANK_W2 ?? '0.35');
-  const w3 = parseFloat(process.env.RANK_W3 ?? '0.25');
+  const w2 = parseFloat(process.env.RANK_W2 ?? '0.20');
+  const w3 = parseFloat(process.env.RANK_W3 ?? '0.40');
   return { w1, w2, w3 };
 }
 
 function compositeScore(user, { w1, w2, w3 }) {
   const courseScore = getCourseScore(user?.course);
-  const branchScore = 5;
+  const yearScore = 5;
   const cpiScore = user?.cpi ?? 0;
-  return courseScore * w1 + branchScore * w2 + cpiScore * w3;
+  return courseScore * w1 + yearScore * w2 + cpiScore * w3;
 }
 
 router.post('/run', authenticate, requireAdmin, async (req, res) => {
@@ -135,10 +134,15 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
         `;
       }
 
+      const html = libraryEmailTemplate({
+        title: "Library Book Allotment Result",
+        body: emailBody,
+      });
+
       await addEmailToQueue({
         sendToEmail: user.email,
-        title: 'Library Book Allotment Result',
-        subject: emailBody,
+        title: "Library Book Allotment Result - Central Library, MNNIT",
+        subject: html,
       });
     }
 
