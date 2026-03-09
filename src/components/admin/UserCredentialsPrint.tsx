@@ -77,10 +77,6 @@ function CredentialGrid({ user }: { user: any }) {
         <p className="text-xl sm:text-2xl font-mono font-bold break-all tracking-widest">
           {user.tempPassword}
         </p>
-
-        <p className="text-xs text-muted-foreground mt-2">
-          Please change this password after first login
-        </p>
       </div>
 
       {/* Footer */}

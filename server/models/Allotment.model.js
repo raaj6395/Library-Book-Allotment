@@ -18,7 +18,7 @@ const allotmentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['allotted', 'waitlisted'],
+    enum: ['allotted', 'not_allotted', 'waitlist'],
     required: true
   },
   createdAt: {
@@ -27,7 +27,9 @@ const allotmentSchema = new mongoose.Schema({
   }
 });
 
-allotmentSchema.index({ eventId: 1, userId: 1 });
-allotmentSchema.index({ eventId: 1, bookId: 1 });
+allotmentSchema.index(
+  { eventId: 1, userId: 1, bookId: 1 },
+  { unique: true }
+);
 
 export default mongoose.model('Allotment', allotmentSchema);

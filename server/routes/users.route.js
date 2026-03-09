@@ -6,6 +6,7 @@ import Student from "../models/Student.model.js";
 import { addEmailToQueue } from "../emailWorker/emailService.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import { libraryEmailTemplate } from "../utils/emailTemplates.js";
 
 const router = express.Router();
 
@@ -87,16 +88,30 @@ router.post(
         cpi: student.cpi,
       });
 
+      const body = `
+<p>Dear ${student.name},</p>
+
+<p>Your account has been created for the <strong>Library Book Allotment System</strong>.</p>
+
+<p>
+<strong>Email:</strong> ${student.email}<br>
+<strong>Temporary Password:</strong> ${tempPassword}
+</p>
+
+<p>Please login and change your password after first login.</p>
+`;
+
+      const html = libraryEmailTemplate({
+        title: "Library System Account Created",
+        body,
+      });
+
       await user.save();
 
       await addEmailToQueue({
         sendToEmail: student.email,
-        title: "Your Library System Credentials",
-        subject: `<p>Hello ${student.name},</p>
-<p>Your account has been created for the Library Book Allotment System.</p>
-<p><strong>Email:</strong> ${student.email}<br>
-<strong>Password:</strong> ${tempPassword}</p>
-<p>Please log in and change your password after first login.</p>`,
+        title: "Library System Credentials - Central Library, MNNIT",
+        subject: html,
       });
 
       const userResponse = user.toObject();
