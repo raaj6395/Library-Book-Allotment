@@ -7,6 +7,7 @@ import Allotment from '../models/Allotment.model.js';
 import AllotmentEvent from '../models/AllotmentEvent.model.js';
 import { addEmailToQueue } from '../emailWorker/emailService.js';
 import { libraryEmailTemplate } from "../utils/emailTemplates.js";
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -17,11 +18,16 @@ const COURSE_RANK = {
   'PhD': 10,
   'M.Tech': 9,
   'B.Tech': 8,
-  'MCA':8
+  'MCA': 8
 };
 
 function getCourseScore(course) {
   return COURSE_RANK[course] ?? 5;
+}
+
+function getYearScore(user) {
+  if (!user?.batch) return 0;
+  return parseInt(user.batch) || 0;
 }
 
 function getWeights() {
@@ -33,7 +39,7 @@ function getWeights() {
 
 function compositeScore(user, { w1, w2, w3 }) {
   const courseScore = getCourseScore(user?.course);
-  const yearScore = 5;
+  const yearScore = getYearScore(user);
   const cpiScore = user?.cpi ?? 0;
   return courseScore * w1 + yearScore * w2 + cpiScore * w3;
 }
@@ -50,13 +56,22 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       .populate('rankedBookIds')
       .sort({ submittedAt: 1 });
 
+    const previouslyAllottedUsers = await Allotment.distinct("userId", {
+      status: { $in: ["allotted", "not_allotted"] }
+    });
+
     const allBooks = await Book.find();
     const bookAvailability = {};
     allBooks.forEach(book => {
       bookAvailability[book._id.toString()] = book.availableCopies;
     });
 
-    const validPreferences = preferences.filter(pref => pref.userId != null);
+    const validPreferences = preferences.filter(pref =>
+      pref.userId &&
+      !previouslyAllottedUsers.some(
+        id => id.toString() === pref.userId._id.toString()
+      )
+    );
 
     const scoredPrefs = validPreferences.map(pref => ({
       pref,
@@ -89,17 +104,17 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
           if (!(bookAvailability[bookId] > 0)) continue;
           if (userAllotted.has(bookId)) continue;
 
-          const allocation = new Allotment({
+          allAllocations.push({
             eventId: event._id,
             userId: pref.userId._id,
             bookId: book._id,
-            status: 'allotted',
+            status: 'allotted'
           });
-          await allocation.save();
-          allAllocations.push(allocation);
+          // await allocation.save();
+          // allAllocations.push(allocation);
 
           bookAvailability[bookId]--;
-          await Book.findByIdAndUpdate(book._id, { $inc: { availableCopies: -1 } });
+          // await Book.findByIdAndUpdate(book._id, { $inc: { availableCopies: -1 } });
 
           userAllotted.add(bookId);
           break;
@@ -107,24 +122,78 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       }
     }
 
+    //update for not-allotted
+    for (const { pref } of scoredPrefs) {
+
+      const userId = pref.userId._id.toString();
+      const userAllotted = allottedPerUser[userId];
+
+      for (const book of pref.rankedBookIds) {
+
+        if (!book) continue;
+
+        const bookId = book._id.toString();
+
+        if (!userAllotted.has(bookId)) {
+
+          allAllocations.push({
+            eventId: event._id,
+            userId: pref.userId._id,
+            bookId: book._id,
+            status: 'not_allotted'
+          });
+
+        }
+
+      }
+
+    }
+
+    if (allAllocations.length > 0) {
+      await Allotment.insertMany(allAllocations);
+    }
+
+    const bookUpdates = [];
+
+    for (const bookId in bookAvailability) {
+      bookUpdates.push({
+        updateOne: {
+          filter: { _id: bookId },
+          update: { $set: { availableCopies: bookAvailability[bookId] } }
+        }
+      });
+    }
+
+    if (bookUpdates.length > 0) {
+      await Book.bulkWrite(bookUpdates);
+    }
+
+    const userAllottedBooks = {};
+
+    allAllocations.forEach(a => {
+      if (!a.bookId) return;
+      const uid = a.userId.toString();
+      if (!userAllottedBooks[uid]) userAllottedBooks[uid] = [];
+      userAllottedBooks[uid].push(a.bookId.toString());
+    });
+
     for (const { pref } of scoredPrefs) {
       const user = pref.userId;
       const userId = user._id.toString();
-      const userAllotted = allottedPerUser[userId];
+      const booksReceived = userAllottedBooks[userId] || [];
 
       let emailBody;
-      if (userAllotted.size === 0) {
+      if (booksReceived.length === 0) {
         emailBody = `
           <p>Dear ${user.name},</p>
           <p>We regret to inform you that no books could be allotted to you in this allotment round.</p>
           <p>Please contact the library administration for further assistance.</p>
         `;
       } else {
-        const allottedBooks = pref.rankedBookIds.filter(b =>
-          b != null && userAllotted.has(b._id.toString())
-        );
-        const bookList = allottedBooks
-          .map((b, i) => `<li>${i + 1}. <strong>${b.title}</strong> by ${b.author}</li>`)
+        const titles = await Book.find({ _id: { $in: booksReceived } });
+
+        const bookList = titles
+          .map(b => `<li><strong>${b.title}</strong> by ${b.author}</li>`)
           .join('');
         emailBody = `
           <p>Dear ${user.name},</p>
@@ -151,11 +220,14 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       .populate('bookId', 'title author isbnOrBookId')
       .sort({ createdAt: 1 });
 
+    const allottedCount = allAllocations.filter(a => a.status === "allotted").length;
+    const notAllottedCount = allAllocations.filter(a => a.status === "not_allotted").length;
+
     res.json({
       eventId: event._id,
       runAt: event.runAt,
-      totalAllocations: allAllocations.length,
-      totalWaitlists: 0,
+      totalAllocations: allottedCount,
+      totalNotAllotted: notAllottedCount,
       results,
     });
   } catch (error) {
@@ -283,21 +355,22 @@ router.get('/events', authenticate, requireAdmin, async (_req, res) => {
   }
 });
 
+
 router.get('/my-allocation', authenticate, async (req, res) => {
   try {
-    const latestEvent = await AllotmentEvent.findOne().sort({ runAt: -1 });
-    if (!latestEvent) return res.json([]);
 
     const allocations = await Allotment.find({
-      eventId: latestEvent._id,
       userId: req.user.id,
-      status: 'allotted',
-    }).populate('bookId', 'title author isbnOrBookId category');
+      status: { $in: ["allotted", "not_allotted"] }
+    })
+      .populate("bookId", "title author isbnOrBookId category")
+      .sort({ createdAt: -1 });
 
     res.json(allocations);
+
   } catch (error) {
-    console.error('Error fetching user allocation:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error fetching user allocation:", error);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

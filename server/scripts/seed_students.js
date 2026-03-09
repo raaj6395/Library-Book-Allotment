@@ -55,9 +55,13 @@ const seedStudents = async () => {
       const registrationNumber = String(
         row["Registration Number"] ?? "",
       ).trim();
-      const email = String(row["Email"] ?? "")
-        .trim()
-        .toLowerCase();
+      let emailCell = row["Email"];
+
+      if (emailCell && typeof emailCell === "object") {
+        emailCell = emailCell.text || emailCell.hyperlink || "";
+      }
+
+      const email = String(emailCell).trim().toLowerCase();
 
       if (!registrationNumber || !email) {
         console.warn(
