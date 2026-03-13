@@ -25,7 +25,7 @@ import Book    from '../models/Book.model.js';
 import Student from '../models/Student.model.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SAMPLE_DIR = path.join(__dirname, '../../sample_data');
+const SAMPLE_DIR = path.join(__dirname, '../sample_data');
 const CLEAR = process.env.CLEAR === '1';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/library-book-allotment';
