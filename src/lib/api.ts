@@ -138,9 +138,7 @@ export const allotmentAPI = {
       method: "POST",
       body: JSON.stringify({ semesterType, semesterYear }),
     }),
-  clearAllotmentData: () =>
-    apiRequest("/allotment/clear", { method: "POST" }),
-  getSlip: (regNo: string) => apiRequest(`/allotment/slip/${encodeURIComponent(regNo)}`),
+getSlip: (regNo: string) => apiRequest(`/allotment/slip/${encodeURIComponent(regNo)}`),
   getReturns: (regNo: string) => apiRequest(`/allotment/returns/${encodeURIComponent(regNo)}`),
   markReturned: (allotmentId: string) =>
     apiRequest(`/allotment/return/${allotmentId}`, { method: "POST" }),

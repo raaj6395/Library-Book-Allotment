@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Download, Loader2, Play, RefreshCw, RotateCcw, Trash2, BookCheck, Printer } from 'lucide-react';
+import { Download, Loader2, Play, RefreshCw, RotateCcw, BookCheck, Printer } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -43,8 +43,6 @@ export default function AllotmentSection() {
 
   // Token reset
   const [resettingTokens, setResettingTokens] = useState(false);
-  const [clearingAllotment, setClearingAllotment] = useState(false);
-
   // Book returns
   const [returnRegNo, setReturnRegNo] = useState('');
   const [returnData, setReturnData] = useState<any>(null);
@@ -155,22 +153,6 @@ export default function AllotmentSection() {
       toast({ title: 'Error', description: error.message || 'Failed to reset tokens', variant: 'destructive' });
     } finally {
       setResettingTokens(false);
-    }
-  };
-
-  const handleClearAllotment = async () => {
-    if (!confirm('Clear ALL allotment records and token counters? This cannot be undone.')) return;
-    setClearingAllotment(true);
-    try {
-      await allotmentAPI.clearAllotmentData();
-      setResults(null);
-      setSelectedEventId(null);
-      setEvents([]);
-      toast({ title: 'Cleared', description: 'All allotment data has been cleared.' });
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to clear data', variant: 'destructive' });
-    } finally {
-      setClearingAllotment(false);
     }
   };
 
@@ -292,11 +274,7 @@ export default function AllotmentSection() {
               {resettingTokens ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
               Reset Token Counters
             </Button>
-            <Button variant="destructive" onClick={handleClearAllotment} disabled={clearingAllotment}>
-              {clearingAllotment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Clear Allotment Data
-            </Button>
-            <Button variant="outline" onClick={handleDownloadNonReturned} disabled={downloading}>
+<Button variant="outline" onClick={handleDownloadNonReturned} disabled={downloading}>
               {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Export Non-Returned Books
             </Button>

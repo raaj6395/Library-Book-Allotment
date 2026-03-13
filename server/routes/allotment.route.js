@@ -245,19 +245,6 @@ router.post('/reset-tokens', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// POST /allotment/clear — clear all allotment records and reset token counters
-router.post('/clear', authenticate, requireAdmin, async (req, res) => {
-  try {
-    await Allotment.deleteMany({});
-    await AllotmentEvent.deleteMany({});
-    await AllotmentMeta.deleteMany({});
-    res.json({ message: 'All allotment data cleared' });
-  } catch (error) {
-    console.error('Error clearing allotment data:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // GET /allotment/slip/:regNo — generate allotment slip for a student
 router.get('/slip/:regNo', authenticate, requireAdmin, async (req, res) => {
   try {
