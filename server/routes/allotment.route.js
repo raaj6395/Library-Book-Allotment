@@ -8,6 +8,7 @@ import AllotmentEvent from '../models/AllotmentEvent.model.js';
 import AllotmentMeta from '../models/AllotmentMeta.model.js';
 import User from '../models/User.model.js';
 import { addEmailToQueue } from '../emailWorker/emailService.js';
+import { libraryEmailTemplate } from "../utils/emailTemplates.js";
 
 const router = express.Router();
 
@@ -198,10 +199,15 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
         `;
       }
 
+      const html = libraryEmailTemplate({
+        title: "Library Book Allotment Result",
+        body: emailBody,
+      });
+
       await addEmailToQueue({
         sendToEmail: user.email,
-        title: 'Library Book Allotment Result',
-        subject: emailBody,
+        title: "Library Book Allotment Result - Central Library, MNNIT",
+        subject: html,
       });
     }
 
