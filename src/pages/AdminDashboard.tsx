@@ -2,11 +2,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Users, BookOpen, Play, LogOut } from 'lucide-react';
+import { Users, BookOpen, Play, LogOut, Upload, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AddBookForm from '@/components/admin/AddBookForm';
 import AddUserForm from '@/components/admin/AddUserForm';
 import AllotmentSection from '@/components/admin/AllotmentSection';
+import StudentUploadSection from '@/components/admin/StudentUploadSection';
+import BulkBookUpload from '@/components/admin/BulkBookUpload';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -69,14 +71,14 @@ export default function AdminDashboard() {
         <Tabs defaultValue="books" className="w-full space-y-6">
 
           {/* Tabs */}
-          <TabsList className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 h-auto p-1">
+          <TabsList className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 h-auto p-1">
 
             <TabsTrigger
               value="books"
               className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
             >
               <BookOpen className="mr-2 h-4 w-4" />
-              Add Book
+              Books
             </TabsTrigger>
 
             <TabsTrigger
@@ -84,7 +86,7 @@ export default function AdminDashboard() {
               className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
             >
               <Users className="mr-2 h-4 w-4" />
-              Add User
+              Users
             </TabsTrigger>
 
             <TabsTrigger
@@ -92,7 +94,23 @@ export default function AdminDashboard() {
               className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
             >
               <Play className="mr-2 h-4 w-4" />
-              Run Allotment
+              Allotment
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="students"
+              className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
+            >
+              <GraduationCap className="mr-2 h-4 w-4" />
+              Student Data
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="book-upload"
+              className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Bulk Upload
             </TabsTrigger>
 
           </TabsList>
@@ -110,6 +128,14 @@ export default function AdminDashboard() {
 
             <TabsContent value="allotment" className="mt-4">
               <AllotmentSection />
+            </TabsContent>
+
+            <TabsContent value="students" className="mt-4">
+              <StudentUploadSection />
+            </TabsContent>
+
+            <TabsContent value="book-upload" className="mt-4">
+              <BulkBookUpload />
             </TabsContent>
 
           </div>

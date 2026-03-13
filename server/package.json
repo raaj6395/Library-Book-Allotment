@@ -6,7 +6,7 @@
     "dev": "node --watch server.js",
     "start": "node server.js",
     "seed": "node scripts/seed_data.js",
-    "clear:users": "node scripts/clear_users.js",
+    "clear:db": "node scripts/clear_db.js",
     "test": "node --test tests/healthCheck.test.js"
   },
   "dependencies": {

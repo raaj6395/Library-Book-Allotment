@@ -34,6 +34,11 @@ const bookSchema = new mongoose.Schema({
     default: 1,
     min: 0
   },
+  classNo: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   description: {
     type: String,
     trim: true

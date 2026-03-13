@@ -125,13 +125,25 @@ export const preferencesAPI = {
 };
 
 export const allotmentAPI = {
-  runAllotment: () =>
+  runAllotment: (payload: { course: string; year: string; semesterType: string; semesterYear: number }) =>
     apiRequest("/allotment/run", {
       method: "POST",
+      body: JSON.stringify(payload),
     }),
   getResults: (eventId: string) => apiRequest(`/allotment/results/${eventId}`),
   getEvents: () => apiRequest("/allotment/events"),
   getMyAllocation: () => apiRequest("/allotment/my-allocation"),
+  resetTokens: (semesterType: string, semesterYear: number) =>
+    apiRequest("/allotment/reset-tokens", {
+      method: "POST",
+      body: JSON.stringify({ semesterType, semesterYear }),
+    }),
+  clearAllotmentData: () =>
+    apiRequest("/allotment/clear", { method: "POST" }),
+  getSlip: (regNo: string) => apiRequest(`/allotment/slip/${encodeURIComponent(regNo)}`),
+  getReturns: (regNo: string) => apiRequest(`/allotment/returns/${encodeURIComponent(regNo)}`),
+  markReturned: (allotmentId: string) =>
+    apiRequest(`/allotment/return/${allotmentId}`, { method: "POST" }),
   downloadReport: async (eventId: string) => {
     const headers: HeadersInit = {};
     const token = getToken();
@@ -148,6 +160,73 @@ export const allotmentAPI = {
     a.download = `allotment-report-${eventId}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
+  },
+  downloadNonReturnedReport: async () => {
+    const headers: HeadersInit = {};
+    const token = getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/allotment/non-returned-report`, { headers });
+    if (!response.ok) throw new Error("Failed to download report");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "non-returned-books.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+};
+
+export const studentsAPI = {
+  list: (course?: string, year?: string) => {
+    const params = new URLSearchParams();
+    if (course) params.append("course", course);
+    if (year) params.append("year", year);
+    const q = params.toString() ? `?${params.toString()}` : "";
+    return apiRequest(`/students${q}`);
+  },
+  clear: (course?: string, year?: string) => {
+    const params = new URLSearchParams();
+    if (course) params.append("course", course);
+    if (year) params.append("year", year);
+    const q = params.toString() ? `?${params.toString()}` : "";
+    return apiRequest(`/students/clear${q}`, { method: "DELETE" });
+  },
+  uploadExcel: async (file: File, course: string, year: string) => {
+    const token = getToken();
+    const headers: HeadersInit = {
+      "Content-Type": "application/octet-stream",
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const response = await fetch(
+      `${API_BASE_URL}/students/upload?course=${encodeURIComponent(course)}&year=${encodeURIComponent(year)}`,
+      { method: "POST", headers, body: await file.arrayBuffer() },
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: "Upload failed" }));
+      throw new Error(err.error || "Upload failed");
+    }
+    return response.json();
+  },
+};
+
+export const bookUploadAPI = {
+  uploadExcel: async (file: File) => {
+    const token = getToken();
+    const headers: HeadersInit = {
+      "Content-Type": "application/octet-stream",
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE_URL}/books/bulk-upload`, {
+      method: "POST",
+      headers,
+      body: await file.arrayBuffer(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: "Upload failed" }));
+      throw new Error(err.error || "Upload failed");
+    }
+    return response.json();
   },
 };
 

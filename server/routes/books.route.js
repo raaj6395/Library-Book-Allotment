@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
 
     const total = await Book.countDocuments(filter);
     const items = await Book.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ classNo: 1, title: 1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
@@ -68,7 +68,7 @@ router.post('/',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { title, author, isbnOrBookId, category, totalCopies = 1, description } = req.body;
+      const { title, author, isbnOrBookId, category, totalCopies = 1, description, classNo } = req.body;
 
       let finalIsbnOrBookId = isbnOrBookId;
       if (!finalIsbnOrBookId || !finalIsbnOrBookId.trim()) {
@@ -91,7 +91,8 @@ router.post('/',
         category: category || '',
         totalCopies,
         availableCopies: totalCopies,
-        description: description || ''
+        description: description || '',
+        classNo: classNo ? classNo.trim() : '',
       });
 
       await book.save();
@@ -126,16 +127,20 @@ router.put('/:id',
         return res.status(404).json({ error: 'Book not found' });
       }
 
-      const { title, author, category, totalCopies, description } = req.body;
+      const { title, author, category, totalCopies, description, classNo, availableCopies } = req.body;
 
       if (title) book.title = title;
       if (author) book.author = author;
       if (category !== undefined) book.category = category;
       if (description !== undefined) book.description = description;
+      if (classNo !== undefined) book.classNo = classNo;
       if (totalCopies !== undefined) {
         const diff = totalCopies - book.totalCopies;
         book.totalCopies = totalCopies;
         book.availableCopies = Math.max(0, book.availableCopies + diff);
+      }
+      if (availableCopies !== undefined) {
+        book.availableCopies = Math.max(0, Math.min(availableCopies, book.totalCopies));
       }
 
       await book.save();

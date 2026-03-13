@@ -7,13 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Trash } from 'lucide-react';
+import { Loader2, Plus, Trash, Edit2, Check, X } from 'lucide-react';
 
 interface BookFormData {
   title: string;
   author: string;
   isbnOrBookId: string;
   category: string;
+  classNo: string;
   totalCopies: number;
   description: string;
 }
@@ -30,6 +31,9 @@ export default function AddBookForm() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editingCopies, setEditingCopies] = useState<string | null>(null);
+  const [editCopiesValue, setEditCopiesValue] = useState<number>(0);
+  const [savingCopies, setSavingCopies] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const limit = 15;
@@ -40,6 +44,7 @@ export default function AddBookForm() {
     defaultValues: {
       totalCopies: 1,
       category: '',
+      classNo: '',
       description: '',
     },
   });
@@ -118,6 +123,29 @@ export default function AddBookForm() {
     }
   };
 
+  const startEditCopies = (b: any) => {
+    setEditingCopies(b._id);
+    setEditCopiesValue(b.totalCopies);
+  };
+
+  const cancelEditCopies = () => {
+    setEditingCopies(null);
+  };
+
+  const saveEditCopies = async (id: string) => {
+    setSavingCopies(true);
+    try {
+      const updated = await booksAPI.update(id, { totalCopies: editCopiesValue });
+      setBooks((s) => s.map((b) => b._id === id ? { ...b, totalCopies: updated.totalCopies, availableCopies: updated.availableCopies } : b));
+      toast({ title: 'Updated', description: 'Available copies updated' });
+      setEditingCopies(null);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to update copies', variant: 'destructive' });
+    } finally {
+      setSavingCopies(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this book? This will hide it from students.')) return;
     setDeleting(id);
@@ -188,6 +216,15 @@ export default function AddBookForm() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="classNo">Class No. (Shelf No.)</Label>
+                <Input
+                  id="classNo"
+                  {...register('classNo')}
+                  placeholder="005.133"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="totalCopies">Total Copies *</Label>
                 <Input
                   id="totalCopies"
@@ -246,37 +283,67 @@ export default function AddBookForm() {
           {listError && (
             <div className="p-4 text-destructive">{listError}</div>
           )}
-          <table className="w-full table-fixed">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr>
-                <th className="text-left w-[40%]">Title</th>
-                <th className="text-left w-[25%]">Author</th>
-                <th className="text-left w-[20%]">Created</th>
-                <th className="text-right w-[15%]">Actions</th>
+              <tr className="border-b">
+                <th className="text-left py-2 pr-2 min-w-[180px]">Title</th>
+                <th className="text-left py-2 pr-2 min-w-[120px]">Author</th>
+                <th className="text-left py-2 pr-2 w-[90px]">Class No.</th>
+                <th className="text-left py-2 pr-2 w-[80px]">Copies</th>
+                <th className="text-right py-2 w-[140px]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {listLoading && books.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                  <td colSpan={5} className="p-4 text-center text-muted-foreground">
                     Loading...
                   </td>
                 </tr>
               ) : books.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                  <td colSpan={5} className="p-4 text-center text-muted-foreground">
                     No books found.
                   </td>
                 </tr>
               ) : (
                 books.map((b) => (
                   <tr key={b._id} className="border-t">
-                    <td className="truncate max-w-[300px]" title={b.title}>
+                    <td className="py-2 pr-2 truncate max-w-[200px]" title={b.title}>
                       {b.title}
                     </td>
-                    <td>{b.author || '-'}</td>
-                    <td>{new Date(b.createdAt).toLocaleString()}</td>
-                    <td className="text-right">
+                    <td className="py-2 pr-2">{b.author || '-'}</td>
+                    <td className="py-2 pr-2 text-muted-foreground">{b.classNo || '-'}</td>
+                    <td className="py-2 pr-2">
+                      {editingCopies === b._id ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={editCopiesValue}
+                            onChange={(e) => setEditCopiesValue(Number(e.target.value))}
+                            className="h-7 w-16 text-xs px-1"
+                          />
+                          <button onClick={() => saveEditCopies(b._id)} disabled={savingCopies} className="text-green-600 hover:text-green-800">
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button onClick={cancelEditCopies} className="text-muted-foreground hover:text-foreground">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline flex items-center gap-1"
+                          onClick={() => startEditCopies(b)}
+                          title="Click to update available copies"
+                        >
+                          {b.availableCopies}/{b.totalCopies}
+                          <Edit2 className="h-3 w-3 text-muted-foreground" />
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right">
                       <Button
                         variant="destructive"
                         size="sm"
@@ -299,6 +366,7 @@ export default function AddBookForm() {
               )}
             </tbody>
           </table>
+          </div>
           <div className="flex items-center justify-center gap-4 mt-4">
             <Button
               variant="outline"

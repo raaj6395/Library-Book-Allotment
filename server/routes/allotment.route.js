@@ -5,48 +5,60 @@ import Preference from '../models/Preference.model.js';
 import Book from '../models/Book.model.js';
 import Allotment from '../models/Allotment.model.js';
 import AllotmentEvent from '../models/AllotmentEvent.model.js';
+import AllotmentMeta from '../models/AllotmentMeta.model.js';
+import User from '../models/User.model.js';
 import { addEmailToQueue } from '../emailWorker/emailService.js';
 
 const router = express.Router();
 
-const ROUNDS = 5;
 const MAX_BOOKS_PER_STUDENT = 5;
 
-const COURSE_RANK = {
-  'PhD': 10,
-  'M.Tech': 8,
-  'M.Sc': 7,
-  'B.Tech': 5,
-  'B.Sc': 4,
-  'Diploma': 2,
-};
-
-function getCourseScore(course) {
-  return COURSE_RANK[course] ?? 5;
+// Build semester key like "Even-2026"
+function getSemesterKey(semesterType, semesterYear) {
+  return `${semesterType}-${semesterYear}`;
 }
 
-function getWeights() {
-  const w1 = parseFloat(process.env.RANK_W1 ?? '0.40');
-  const w2 = parseFloat(process.env.RANK_W2 ?? '0.35');
-  const w3 = parseFloat(process.env.RANK_W3 ?? '0.25');
-  return { w1, w2, w3 };
+// Generate token number for a student
+// BTech: {E|O}/{YEAR}/{SERIAL}  e.g. E/2026/01
+// MCA:   MCA/{E|O}/{YEAR}/{SERIAL}  e.g. MCA/E/2026/01
+function buildTokenNumber(course, semesterType, semesterYear, serial) {
+  const typeChar = semesterType === 'Even' ? 'E' : 'O';
+  const serialStr = String(serial).padStart(2, '0');
+  if (course === 'MCA') {
+    return `MCA/${typeChar}/${semesterYear}/${serialStr}`;
+  }
+  return `${typeChar}/${semesterYear}/${serialStr}`;
 }
 
-function compositeScore(user, { w1, w2, w3 }) {
-  const courseScore = getCourseScore(user?.course);
-  const branchScore = 5;
-  const cpiScore = user?.cpi ?? 0;
-  return courseScore * w1 + branchScore * w2 + cpiScore * w3;
-}
-
+// POST /allotment/run
 router.post('/run', authenticate, requireAdmin, async (req, res) => {
   try {
-    const weights = getWeights();
+    const {
+      course,
+      year,
+      semesterType = 'Even',
+      semesterYear = new Date().getFullYear(),
+    } = req.body;
 
-    const event = new AllotmentEvent({ runByAdminId: req.user.id });
+    if (!course || !year) {
+      return res.status(400).json({ error: 'course and year are required' });
+    }
+
+    const event = new AllotmentEvent({
+      runByAdminId: req.user.id,
+      course,
+      year,
+      semesterType,
+      semesterYear,
+    });
     await event.save();
 
-    const preferences = await Preference.find()
+    // Fetch preferences only for students matching the selected course+year
+    // User.course should be 'BTech' or 'MCA'; User.batch encodes the year (e.g. '2nd Year')
+    const matchingUsers = await User.find({ course, batch: year, role: 'user' }).select('_id');
+    const matchingUserIds = matchingUsers.map(u => u._id);
+
+    const preferences = await Preference.find({ userId: { $in: matchingUserIds } })
       .populate('userId')
       .populate('rankedBookIds')
       .sort({ submittedAt: 1 });
@@ -59,25 +71,25 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
 
     const validPreferences = preferences.filter(pref => pref.userId != null);
 
-    const scoredPrefs = validPreferences.map(pref => ({
-      pref,
-      score: compositeScore(pref.userId, weights),
-    }));
-
-    scoredPrefs.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return new Date(a.pref.submittedAt) - new Date(b.pref.submittedAt);
+    // Sort by CPI descending, then by submission timestamp ascending (FCFS tiebreaker)
+    const scoredPrefs = [...validPreferences].sort((a, b) => {
+      const cpiA = a.userId?.cpi ?? 0;
+      const cpiB = b.userId?.cpi ?? 0;
+      if (cpiB !== cpiA) return cpiB - cpiA;
+      return new Date(a.submittedAt) - new Date(b.submittedAt);
     });
 
     const allottedPerUser = {};
-    scoredPrefs.forEach(({ pref }) => {
+    scoredPrefs.forEach(pref => {
       allottedPerUser[pref.userId._id.toString()] = new Set();
     });
 
     const allAllocations = [];
 
+    // Allocation rounds: each round, each student (in CPI desc order) gets next available preferred book
+    const ROUNDS = MAX_BOOKS_PER_STUDENT;
     for (let round = 0; round < ROUNDS; round++) {
-      for (const { pref } of scoredPrefs) {
+      for (const pref of scoredPrefs) {
         const userId = pref.userId._id.toString();
         const userAllotted = allottedPerUser[userId];
 
@@ -108,30 +120,81 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       }
     }
 
-    for (const { pref } of scoredPrefs) {
+    // Assign token numbers
+    const semKey = getSemesterKey(semesterType, semesterYear);
+    let meta = await AllotmentMeta.findOne({ semesterKey: semKey });
+    if (!meta) {
+      meta = new AllotmentMeta({ semesterKey: semKey, btechSerial: 0, mcaSerial: 0 });
+    }
+
+    // Group users who got at least one book — assign one token per user
+    const usersWithBooks = {};
+    for (const pref of scoredPrefs) {
+      const uid = pref.userId._id.toString();
+      if (allottedPerUser[uid].size > 0) {
+        usersWithBooks[uid] = pref.userId;
+      }
+    }
+
+    // Assign tokens in the order they were processed (CPI desc)
+    const tokenMap = {}; // userId -> tokenNumber
+    for (const pref of scoredPrefs) {
+      const uid = pref.userId._id.toString();
+      if (!usersWithBooks[uid]) continue;
+
+      let serial;
+      if (course === 'MCA') {
+        meta.mcaSerial += 1;
+        serial = meta.mcaSerial;
+      } else {
+        meta.btechSerial += 1;
+        serial = meta.btechSerial;
+      }
+      tokenMap[uid] = buildTokenNumber(course, semesterType, semesterYear, serial);
+    }
+    await meta.save();
+
+    // Update allotment records with token numbers
+    for (const [userId, token] of Object.entries(tokenMap)) {
+      await Allotment.updateMany(
+        { eventId: event._id, userId },
+        { $set: { tokenNumber: token } }
+      );
+    }
+
+    // Send emails with all preferences listed
+    for (const pref of scoredPrefs) {
       const user = pref.userId;
       const userId = user._id.toString();
       const userAllotted = allottedPerUser[userId];
+      const tokenNumber = tokenMap[userId] || '';
+
+      const preferenceList = pref.rankedBookIds
+        .filter(b => b != null)
+        .map((b, i) => {
+          const allotted = userAllotted.has(b._id.toString());
+          const mark = allotted ? '✅ ALLOTTED' : '❌ NOT ALLOTTED';
+          return `<li>${i + 1}. <strong>${b.title}</strong> by ${b.author || 'Unknown'} &mdash; ${mark}</li>`;
+        })
+        .join('');
 
       let emailBody;
       if (userAllotted.size === 0) {
         emailBody = `
           <p>Dear ${user.name},</p>
           <p>We regret to inform you that no books could be allotted to you in this allotment round.</p>
+          <p>Your preferences were:</p>
+          <ol>${preferenceList}</ol>
           <p>Please contact the library administration for further assistance.</p>
         `;
       } else {
-        const allottedBooks = pref.rankedBookIds.filter(b =>
-          b != null && userAllotted.has(b._id.toString())
-        );
-        const bookList = allottedBooks
-          .map((b, i) => `<li>${i + 1}. <strong>${b.title}</strong> by ${b.author}</li>`)
-          .join('');
         emailBody = `
           <p>Dear ${user.name},</p>
-          <p>The following book(s) have been allotted to you:</p>
-          <ol>${bookList}</ol>
-          <p>Please visit the library to collect your book(s).</p>
+          <p>Your book allotment results for ${semesterType} Semester ${semesterYear}:</p>
+          <p><strong>Token Number: ${tokenNumber}</strong></p>
+          <p>Your Preferences:</p>
+          <ol>${preferenceList}</ol>
+          <p>Please collect your allotted books from the library with your token number.</p>
         `;
       }
 
@@ -143,13 +206,15 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
     }
 
     const results = await Allotment.find({ eventId: event._id })
-      .populate('userId', 'name email registrationNumber course batch branch')
-      .populate('bookId', 'title author isbnOrBookId')
+      .populate('userId', 'name email registrationNumber course batch branch cpi')
+      .populate('bookId', 'title author isbnOrBookId classNo')
       .sort({ createdAt: 1 });
 
     res.json({
       eventId: event._id,
       runAt: event.runAt,
+      course,
+      year,
       totalAllocations: allAllocations.length,
       totalWaitlists: 0,
       results,
@@ -160,87 +225,152 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+// POST /allotment/reset-tokens — reset serial counters for a semester
+router.post('/reset-tokens', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const {
+      semesterType = 'Even',
+      semesterYear = new Date().getFullYear(),
+    } = req.body;
+    const semKey = getSemesterKey(semesterType, semesterYear);
+    await AllotmentMeta.findOneAndUpdate(
+      { semesterKey: semKey },
+      { $set: { btechSerial: 0, mcaSerial: 0 } },
+      { upsert: true }
+    );
+    res.json({ message: `Token counters reset for ${semKey}` });
+  } catch (error) {
+    console.error('Error resetting tokens:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /allotment/clear — clear all allotment records and reset token counters
+router.post('/clear', authenticate, requireAdmin, async (req, res) => {
+  try {
+    await Allotment.deleteMany({});
+    await AllotmentEvent.deleteMany({});
+    await AllotmentMeta.deleteMany({});
+    res.json({ message: 'All allotment data cleared' });
+  } catch (error) {
+    console.error('Error clearing allotment data:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /allotment/slip/:regNo — generate allotment slip for a student
+router.get('/slip/:regNo', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const user = await User.findOne({ registrationNumber: req.params.regNo });
+    if (!user) return res.status(404).json({ error: 'Student not found' });
+
+    const latestEvent = await AllotmentEvent.findOne().sort({ runAt: -1 });
+    if (!latestEvent) return res.status(404).json({ error: 'No allotment event found' });
+
+    const allotments = await Allotment.find({
+      userId: user._id,
+      status: 'allotted',
+    })
+      .populate('bookId', 'title author classNo isbnOrBookId')
+      .populate('eventId', 'runAt semesterType semesterYear course year')
+      .sort({ createdAt: 1 });
+
+    res.json({
+      student: {
+        name: user.name,
+        registrationNumber: user.registrationNumber,
+        branch: user.branch,
+        course: user.course,
+        batch: user.batch,
+        email: user.email,
+      },
+      allotments: allotments.map(a => ({
+        _id: a._id,
+        tokenNumber: a.tokenNumber,
+        book: a.bookId,
+        allotmentDate: a.createdAt,
+        semesterType: a.eventId?.semesterType,
+        semesterYear: a.eventId?.semesterYear,
+        returned: a.returned,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching slip:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /allotment/report/:eventId — download Excel report
 router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
   try {
     const event = await AllotmentEvent.findById(req.params.eventId);
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    const weights = getWeights();
-
-    const preferences = await Preference.find()
-      .populate('userId')
-      .populate('rankedBookIds')
-      .sort({ submittedAt: 1 });
-
     const allotments = await Allotment.find({
       eventId: req.params.eventId,
       status: 'allotted',
     })
-      .populate('userId', '_id')
-      .populate('bookId', 'title');
+      .populate('userId', 'name registrationNumber course batch branch cpi')
+      .populate('bookId', 'title author classNo isbnOrBookId');
 
-    const allottedTitles = {};
+    // Group by user
+    const byUser = {};
     for (const a of allotments) {
-      if (a.userId == null || a.bookId == null) continue;
+      if (!a.userId || !a.bookId) continue;
       const uid = a.userId._id.toString();
-      if (!allottedTitles[uid]) allottedTitles[uid] = [];
-      allottedTitles[uid].push(a.bookId.title);
+      if (!byUser[uid]) {
+        byUser[uid] = {
+          user: a.userId,
+          tokenNumber: a.tokenNumber,
+          books: [],
+        };
+      }
+      byUser[uid].books.push(a.bookId);
     }
 
-    const scoredPrefs = preferences
-      .filter(pref => pref.userId != null)
-      .map(pref => ({
-        pref,
-        score: compositeScore(pref.userId, weights),
-      }));
-    scoredPrefs.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return new Date(a.pref.submittedAt) - new Date(b.pref.submittedAt);
+    // Sort by branch asc then batch/year asc
+    const rows = Object.values(byUser).sort((a, b) => {
+      const branchCmp = (a.user.branch || '').localeCompare(b.user.branch || '');
+      if (branchCmp !== 0) return branchCmp;
+      return (a.user.batch || '').localeCompare(b.user.batch || '');
     });
-
-    const studentHeader = [
-      'Rank', 'Student ID', 'Name', 'Course',
-      'Book 1', 'Book 2', 'Book 3', 'Book 4', 'Book 5',
-      'Submission Timestamp',
-    ];
-    const studentRows = scoredPrefs.map(({ pref }, index) => {
-      const u = pref.userId;
-      const books = allottedTitles[u._id.toString()] ?? [];
-      const bookCols = [...books, '', '', '', '', ''].slice(0, 5);
-      return [
-        index + 1,
-        u.registrationNumber ?? '',
-        u.name ?? '',
-        u.course ?? '',
-        ...bookCols,
-        pref.submittedAt ? new Date(pref.submittedAt).toISOString() : '',
-      ];
-    });
-
-    const allBooks = await Book.find();
-    const bookHeader = [
-      'Book ID', 'Title', 'Initial Quantity', 'Remaining Quantity', 'Status',
-    ];
-    const bookRows = allBooks.map(b => [
-      b.isbnOrBookId,
-      b.title,
-      b.totalCopies,
-      b.availableCopies,
-      b.availableCopies === 0 ? 'Unavailable' : 'Available',
-    ]);
 
     const workbook = new ExcelJS.Workbook();
-
     const sheet1 = workbook.addWorksheet('Students');
-    sheet1.addRow(studentHeader);
-    for (const row of studentRows) sheet1.addRow(row);
+    sheet1.addRow([
+      'Token No', 'Reg No', 'Name', 'Course', 'Year', 'Branch', 'CPI',
+      'Book 1', 'Book 2', 'Book 3', 'Book 4', 'Book 5',
+    ]);
+    for (const { user, tokenNumber, books } of rows) {
+      const bookCols = [...books.map(b => b.title), '', '', '', '', ''].slice(0, 5);
+      sheet1.addRow([
+        tokenNumber || '',
+        user.registrationNumber || '',
+        user.name || '',
+        user.course || '',
+        user.batch || '',
+        user.branch || '',
+        user.cpi ?? '',
+        ...bookCols,
+      ]);
+    }
 
+    const allBooks = await Book.find().sort({ classNo: 1, title: 1 });
     const sheet2 = workbook.addWorksheet('Books');
-    sheet2.addRow(bookHeader);
-    for (const row of bookRows) sheet2.addRow(row);
+    sheet2.addRow(['Class No', 'Book ID', 'Title', 'Author', 'Total Copies', 'Available Copies', 'Status']);
+    for (const b of allBooks) {
+      sheet2.addRow([
+        b.classNo || '',
+        b.isbnOrBookId,
+        b.title,
+        b.author || '',
+        b.totalCopies,
+        b.availableCopies,
+        b.availableCopies === 0 ? 'Unavailable' : 'Available',
+      ]);
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
-
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="allotment-report-${req.params.eventId}.xlsx"`,
@@ -252,12 +382,20 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+// GET /allotment/results/:eventId
 router.get('/results/:eventId', authenticate, requireAdmin, async (req, res) => {
   try {
     const results = await Allotment.find({ eventId: req.params.eventId })
-      .populate('userId', 'name email registrationNumber course batch branch')
-      .populate('bookId', 'title author isbnOrBookId')
+      .populate('userId', 'name email registrationNumber course batch branch cpi')
+      .populate('bookId', 'title author isbnOrBookId classNo')
       .sort({ createdAt: 1 });
+
+    // Sort by branch asc, then batch/year asc
+    results.sort((a, b) => {
+      const branchCmp = (a.userId?.branch || '').localeCompare(b.userId?.branch || '');
+      if (branchCmp !== 0) return branchCmp;
+      return (a.userId?.batch || '').localeCompare(b.userId?.batch || '');
+    });
 
     res.json(results);
   } catch (error) {
@@ -266,12 +404,12 @@ router.get('/results/:eventId', authenticate, requireAdmin, async (req, res) => 
   }
 });
 
+// GET /allotment/events
 router.get('/events', authenticate, requireAdmin, async (_req, res) => {
   try {
     const events = await AllotmentEvent.find()
       .populate('runByAdminId', 'name email')
       .sort({ runAt: -1 });
-
     res.json(events);
   } catch (error) {
     console.error('Error fetching events:', error);
@@ -279,6 +417,7 @@ router.get('/events', authenticate, requireAdmin, async (_req, res) => {
   }
 });
 
+// GET /allotment/my-allocation
 router.get('/my-allocation', authenticate, async (req, res) => {
   try {
     const latestEvent = await AllotmentEvent.findOne().sort({ runAt: -1 });
@@ -288,11 +427,108 @@ router.get('/my-allocation', authenticate, async (req, res) => {
       eventId: latestEvent._id,
       userId: req.user.id,
       status: 'allotted',
-    }).populate('bookId', 'title author isbnOrBookId category');
+    }).populate('bookId', 'title author isbnOrBookId category classNo');
 
     res.json(allocations);
   } catch (error) {
     console.error('Error fetching user allocation:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /allotment/returns/:regNo — fetch student's allotted books for return
+router.get('/returns/:regNo', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const user = await User.findOne({ registrationNumber: req.params.regNo });
+    if (!user) return res.status(404).json({ error: 'Student not found' });
+
+    const allotments = await Allotment.find({
+      userId: user._id,
+      status: 'allotted',
+    })
+      .populate('bookId', 'title author classNo isbnOrBookId')
+      .populate('eventId', 'runAt semesterType semesterYear')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      student: {
+        _id: user._id,
+        name: user.name,
+        registrationNumber: user.registrationNumber,
+        branch: user.branch,
+        course: user.course,
+        batch: user.batch,
+      },
+      allotments: allotments.map(a => ({
+        _id: a._id,
+        tokenNumber: a.tokenNumber,
+        book: a.bookId,
+        allotmentDate: a.createdAt,
+        returned: a.returned,
+        returnedAt: a.returnedAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching return info:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /allotment/return/:allotmentId — mark a book as returned
+router.post('/return/:allotmentId', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const allotment = await Allotment.findById(req.params.allotmentId);
+    if (!allotment) return res.status(404).json({ error: 'Allotment record not found' });
+    if (allotment.returned) return res.status(400).json({ error: 'Book already marked as returned' });
+
+    allotment.returned = true;
+    allotment.returnedAt = new Date();
+    await allotment.save();
+
+    // Increment available copies
+    await Book.findByIdAndUpdate(allotment.bookId, { $inc: { availableCopies: 1 } });
+
+    res.json({ message: 'Book marked as returned', allotment });
+  } catch (error) {
+    console.error('Error marking book returned:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /allotment/non-returned-report — download Excel of non-returned books
+router.get('/non-returned-report', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const allotments = await Allotment.find({ status: 'allotted', returned: false })
+      .populate('userId', 'name registrationNumber branch batch course')
+      .populate('bookId', 'title classNo isbnOrBookId')
+      .sort({ createdAt: 1 });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Non-Returned Books');
+    sheet.addRow(['Reg No', 'Name', 'Branch', 'Year', 'Book Title', 'Class No', 'Token Number', 'Allotment Date']);
+
+    for (const a of allotments) {
+      if (!a.userId || !a.bookId) continue;
+      sheet.addRow([
+        a.userId.registrationNumber || '',
+        a.userId.name || '',
+        a.userId.branch || '',
+        a.userId.batch || '',
+        a.bookId.title || '',
+        a.bookId.classNo || '',
+        a.tokenNumber || '',
+        a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '',
+      ]);
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="non-returned-books.xlsx"',
+    });
+    res.send(buffer);
+  } catch (error) {
+    console.error('Error generating non-returned report:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
