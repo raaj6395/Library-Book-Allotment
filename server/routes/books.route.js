@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
 
     const total = await Book.countDocuments(filter);
     const items = await Book.find(filter)
-      .sort({ classNo: 1, title: 1 })
+      .sort({ title: 1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
