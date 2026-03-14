@@ -229,7 +229,7 @@ export const bookUploadAPI = {
 };
 
 export const sessionAPI = {
-  getActive: (): Promise<{ session: { _id: string; year: number; semesterType: 'ODD' | 'EVEN'; status: 'ACTIVE' | 'COMPLETED'; createdAt: string; endedAt?: string } | null }> =>
+  getActive: (): Promise<{ session: { _id: string; year: number; semesterType: 'ODD' | 'EVEN'; status: 'ACTIVE' | 'INACTIVE'; createdAt: string; endedAt?: string } | null }> =>
     apiRequest('/admin/session/active'),
 
   create: (payload: { year: number; semesterType: 'ODD' | 'EVEN' }) =>
@@ -248,6 +248,43 @@ export const sessionAPI = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+};
+
+export const tokenAPI = {
+  lookup: (tokenNumber: string) =>
+    apiRequest(`/tokens/${encodeURIComponent(tokenNumber)}`),
+
+  markPickedUp: (tokenNumber: string) =>
+    apiRequest(`/tokens/${encodeURIComponent(tokenNumber)}/pickup`, { method: 'PUT' }),
+
+  markReturned: (tokenNumber: string) =>
+    apiRequest(`/tokens/${encodeURIComponent(tokenNumber)}/return`, { method: 'PUT' }),
+
+  getUnreturned: (sessionId?: string) => {
+    const params = sessionId ? `?sessionId=${sessionId}` : '';
+    return apiRequest(`/tokens/unreturned${params}`);
+  },
+
+  downloadUnreturned: async (sessionId?: string) => {
+    const headers: HeadersInit = {};
+    const token = getToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const params = sessionId ? `?sessionId=${sessionId}` : '';
+    const response = await fetch(`${API_BASE_URL}/tokens/unreturned/download${params}`, { headers });
+    if (!response.ok) throw new Error('Failed to download report');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'unreturned-books.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+};
+
+export const archiveAPI = {
+  getBySession: (sessionId: string) =>
+    apiRequest(`/archive/${sessionId}`),
 };
 
 export const adminBooksAPI = {

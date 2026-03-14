@@ -18,7 +18,7 @@ router.post(
 
       const { email, password } = req.body;
 
-      const user = await User.findOne({ email });
+      const user = await User.findOne({ email }).populate('sessionId');
       if (!user) {
         return res.status(401).json({ error: "no user found with this email" });
       }
@@ -44,6 +44,7 @@ router.post(
           email: user.email,
           role: user.role,
           registrationNumber: user.registrationNumber,
+          activeSession: user.sessionId && user.sessionId.status === 'ACTIVE' ? user.sessionId : null,
         },
       });
     } catch (error) {
@@ -63,7 +64,7 @@ router.get("/me", async (req, res) => {
     const token = String(authHeader).split(" ")[1];
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(payload.id);
+      const user = await User.findById(payload.id).populate('sessionId');
       if (!user) return res.status(404).json({ error: "User not found" });
       return res.json({
         id: user._id,
@@ -71,6 +72,7 @@ router.get("/me", async (req, res) => {
         email: user.email,
         role: user.role,
         registrationNumber: user.registrationNumber,
+        activeSession: user.sessionId && user.sessionId.status === 'ACTIVE' ? user.sessionId : null,
       });
     } catch (err) {
       return res.status(401).json({ error: "Invalid or expired token" });

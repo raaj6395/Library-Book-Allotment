@@ -12,7 +12,7 @@ const sessionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['ACTIVE', 'COMPLETED'],
+    enum: ['ACTIVE', 'INACTIVE'],
     default: 'ACTIVE',
   },
   createdAt: {
@@ -26,6 +26,7 @@ const sessionSchema = new mongoose.Schema({
 });
 
 sessionSchema.index({ status: 1, _id: 1 });
+sessionSchema.index({ semesterType: 1, year: 1 }, { unique: true });
 
 // Enforce single-ACTIVE constraint on new documents
 sessionSchema.pre('save', async function (next) {

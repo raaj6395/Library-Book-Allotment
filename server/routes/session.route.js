@@ -4,6 +4,10 @@ import { requireActiveSession } from '../middleware/requireActiveSession.js';
 import Session from '../models/Session.model.js';
 import AllotmentEvent from '../models/AllotmentEvent.model.js';
 import User from '../models/User.model.js';
+import Student from '../models/Student.model.js';
+import Preference from '../models/Preference.model.js';
+import Token from '../models/Token.model.js';
+import AllotmentArchive from '../models/AllotmentArchive.model.js';
 import { executeAllotment } from '../utils/allotmentLogic.js';
 
 const router = express.Router();
@@ -28,6 +32,13 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       return res.status(400).json({
         error: `An active session already exists: ${existing.semesterType} ${existing.year}`,
         session: existing,
+      });
+    }
+
+    const duplicate = await Session.findOne({ semesterType, year });
+    if (duplicate) {
+      return res.status(400).json({
+        error: `A session for ${semesterType} ${year} already exists`,
       });
     }
 
@@ -104,16 +115,55 @@ router.post('/run-allotment', authenticate, requireAdmin, requireActiveSession, 
   }
 });
 
-// POST /api/admin/session/end — End the active session
+// POST /api/admin/session/end — End the active session (full cleanup + archive)
 router.post('/end', authenticate, requireAdmin, requireActiveSession, async (req, res) => {
   try {
     const session = req.activeSession;
+    const sessionLabel = `${session.semesterType} ${session.year}`;
 
-    session.status = 'COMPLETED';
+    // 1. Archive allotment data from Token collection into AllotmentArchive
+    const tokens = await Token.find({ sessionId: session._id });
+    if (tokens.length > 0) {
+      const archiveDocs = tokens.map(t => ({
+        sessionId: t.sessionId,
+        session: t.session,
+        studentName: t.studentName,
+        regNo: t.regNo,
+        email: t.email,
+        course: t.course,
+        branch: t.branch,
+        year: t.year,
+        allottedBooks: t.allottedBooks.map(b => ({
+          bookId: b.bookId,
+          bookName: b.bookName,
+        })),
+        tokenNumber: t.tokenNumber,
+        isPickedUp: t.isPickedUp,
+        isReturned: t.isReturned,
+        createdAt: t.createdAt,
+      }));
+      await AllotmentArchive.insertMany(archiveDocs);
+    }
+
+    // 2. Delete all Users except admins
+    await User.deleteMany({ role: { $ne: 'admin' } });
+
+    // 3. Delete all Students
+    await Student.deleteMany({});
+
+    // 4. Delete all Preferences
+    await Preference.deleteMany({});
+
+    // 5. Mark session as INACTIVE
+    session.status = 'INACTIVE';
     session.endedAt = new Date();
     await session.save();
 
-    res.json({ message: 'Session ended successfully', session });
+    res.json({
+      message: `Session ${sessionLabel} ended successfully. Users, students, and preferences have been reset. ${tokens.length} allotment records archived.`,
+      session,
+      archived: tokens.length,
+    });
   } catch (error) {
     console.error('Error ending session:', error);
     res.status(500).json({ error: 'Server error' });

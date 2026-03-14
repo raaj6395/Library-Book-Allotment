@@ -5,7 +5,7 @@ type Session = {
   _id: string;
   year: number;
   semesterType: 'ODD' | 'EVEN';
-  status: 'ACTIVE' | 'COMPLETED';
+  status: 'ACTIVE' | 'INACTIVE';
   createdAt: string;
 };
 

@@ -18,6 +18,8 @@ import preferenceRoutes from './routes/preferences.route.js';
 import allotmentRoutes  from './routes/allotment.route.js';
 import studentRoutes    from './routes/students.route.js';
 import sessionRoutes    from './routes/session.route.js';
+import tokenRoutes      from './routes/token.route.js';
+import archiveRoutes    from './routes/archive.route.js';
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
 
@@ -90,6 +92,8 @@ async function initServer() {
   app.use('/api/allotment',    allotmentRoutes);
   app.use('/api/students',     studentRoutes);
   app.use('/api/admin/session', sessionRoutes);
+  app.use('/api/tokens',         tokenRoutes);
+  app.use('/api/archive',        archiveRoutes);
 
   // ─── Health check endpoint ───────────────────────────────────────────────────
 

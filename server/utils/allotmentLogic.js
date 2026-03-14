@@ -3,6 +3,8 @@ import Preference from '../models/Preference.model.js';
 import Book from '../models/Book.model.js';
 import Allotment from '../models/Allotment.model.js';
 import AllotmentMeta from '../models/AllotmentMeta.model.js';
+import Token from '../models/Token.model.js';
+import Session from '../models/Session.model.js';
 import { addEmailToQueue } from '../emailWorker/emailService.js';
 import { libraryEmailTemplate } from './emailTemplates.js';
 
@@ -58,8 +60,10 @@ export async function executeAllotment({ event, course, year, semesterType, seme
 
   const allBooks = await Book.find();
   const bookAvailability = {};
+  const bookMap = {};
   allBooks.forEach(book => {
     bookAvailability[book._id.toString()] = book.availableCopies;
+    bookMap[book._id.toString()] = book;
   });
 
   const validPreferences = preferences.filter(pref => pref.userId != null);
@@ -153,7 +157,50 @@ export async function executeAllotment({ event, course, year, semesterType, seme
     );
   }
 
-  // 7. Send result emails
+  // 7. Create denormalized Token records
+  // Build the session label from the Session document (or from semesterType/semesterYear)
+  let sessionLabel = `${semesterType === 'Even' ? 'EVEN' : 'ODD'} ${semesterYear}`;
+  if (sessionId) {
+    const sessionDoc = await Session.findById(sessionId);
+    if (sessionDoc) {
+      sessionLabel = `${sessionDoc.semesterType} ${sessionDoc.year}`;
+    }
+  }
+
+  for (const pref of scoredPrefs) {
+    const user = pref.userId;
+    const uid = user._id.toString();
+    const tokenNumber = tokenMap[uid];
+    if (!tokenNumber) continue; // no books allotted
+
+    const allottedBookIds = [...allottedPerUser[uid]];
+    const allottedBooks = allottedBookIds.map(bookId => {
+      const book = bookMap[bookId];
+      return {
+        bookId: book._id,
+        bookName: book.title,
+        quantity: 1,
+      };
+    });
+
+    const token = new Token({
+      tokenNumber,
+      studentName: user.name,
+      regNo: user.registrationNumber,
+      email: user.email,
+      course: user.course || course,
+      branch: user.branch || '',
+      year: parseInt(user.batch) || semesterYear,
+      session: sessionLabel,
+      sessionId: sessionId || event._id, // fallback for backward compat
+      allottedBooks,
+      isPickedUp: false,
+      isReturned: false,
+    });
+    await token.save();
+  }
+
+  // 8. Send result emails
   for (const pref of scoredPrefs) {
     const user = pref.userId;
     const userId = user._id.toString();
@@ -201,7 +248,7 @@ export async function executeAllotment({ event, course, year, semesterType, seme
     });
   }
 
-  // 8. Return results
+  // 9. Return results
   const results = await Allotment.find({ eventId: event._id })
     .populate('userId', 'name email registrationNumber course batch branch cpi')
     .populate('bookId', 'title author isbnOrBookId classNo')

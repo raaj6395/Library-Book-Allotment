@@ -13,6 +13,14 @@ interface User {
   email: string;
   role: "admin" | "user";
   registrationNumber: string;
+  activeSession?: {
+    _id: string;
+    year: number;
+    semesterType: 'ODD' | 'EVEN';
+    status: 'ACTIVE' | 'INACTIVE';
+    createdAt: string;
+    endedAt?: string;
+  } | null;
 }
 
 interface LoginResponse {

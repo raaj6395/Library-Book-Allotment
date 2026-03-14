@@ -6,7 +6,7 @@ type Session = {
   _id: string;
   year: number;
   semesterType: 'ODD' | 'EVEN';
-  status: 'ACTIVE' | 'COMPLETED';
+  status: 'ACTIVE' | 'INACTIVE';
   createdAt: string;
   endedAt?: string;
   eventCount?: number;
@@ -138,7 +138,7 @@ export function SessionSection({ onSessionChange }: SessionSectionProps) {
                   Are you sure you want to end this session?
                 </p>
                 <p className="text-xs text-red-600">
-                  All users and allotments remain archived. A new session can be created afterward.
+                  This will delete all users (except admin), students, and preferences. Allotment data will be archived. Tokens remain for future returns.
                 </p>
                 <div className="flex gap-3">
                   <button

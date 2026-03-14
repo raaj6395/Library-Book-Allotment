@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Users, BookOpen, Play, LogOut, Upload, GraduationCap, CalendarClock } from 'lucide-react';
+import { Users, BookOpen, Play, LogOut, Upload, GraduationCap, CalendarClock, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AddBookForm from '@/components/admin/AddBookForm';
 import AddUserForm from '@/components/admin/AddUserForm';
@@ -11,6 +11,7 @@ import StudentUploadSection from '@/components/admin/StudentUploadSection';
 import BulkBookUpload from '@/components/admin/BulkBookUpload';
 import { SessionBanner } from '@/components/admin/SessionBanner';
 import { SessionSection } from '@/components/admin/SessionSection';
+import TokenSection from '@/components/admin/TokenSection';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -80,7 +81,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="session" className="w-full space-y-6">
 
           {/* Tabs */}
-          <TabsList className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 h-auto p-1">
+          <TabsList className="w-full grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 h-auto p-1">
 
             <TabsTrigger
               value="session"
@@ -123,6 +124,14 @@ export default function AdminDashboard() {
             </TabsTrigger>
 
             <TabsTrigger
+              value="tokens"
+              className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
+            >
+              <Ticket className="mr-2 h-4 w-4" />
+              Tokens
+            </TabsTrigger>
+
+            <TabsTrigger
               value="book-upload"
               className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
             >
@@ -153,6 +162,10 @@ export default function AdminDashboard() {
 
             <TabsContent value="students" className="mt-4">
               <StudentUploadSection />
+            </TabsContent>
+
+            <TabsContent value="tokens" className="mt-4">
+              <TokenSection />
             </TabsContent>
 
             <TabsContent value="book-upload" className="mt-4">
