@@ -1,15 +1,20 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
+import { requireActiveSession } from '../middleware/requireActiveSession.js';
 import Preference from '../models/Preference.model.js';
+import Session from '../models/Session.model.js';
 import Book from '../models/Book.model.js';
 
 const router = express.Router();
 
-router.get('/me', authenticate, async (req, res) => {
+// GET /preferences/me — get the current user's preferences for the active session
+router.get('/me', authenticate, requireActiveSession, async (req, res) => {
   try {
-    const preference = await Preference.findOne({ userId: req.user.id })
-      .populate('rankedBookIds', 'title author isbnOrBookId');
+    const preference = await Preference.findOne({
+      userId: req.user.id,
+      sessionId: req.activeSession._id,
+    }).populate('rankedBookIds', 'title author isbnOrBookId');
 
     if (!preference) {
       return res.json(null);
@@ -21,8 +26,10 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
+// POST /preferences — submit preferences for the active session
 router.post('/',
   authenticate,
+  requireActiveSession,
   [
     body('rankedBookIds').isArray({ min: 1, max: 10 }).withMessage('Must provide 1-10 book preferences'),
     body('rankedBookIds.*').isMongoId().withMessage('Invalid book ID')
@@ -35,24 +42,29 @@ router.post('/',
       }
 
       const { rankedBookIds } = req.body;
+      const activeSession = req.activeSession;
 
       const books = await Book.find({ _id: { $in: rankedBookIds } });
       if (books.length !== rankedBookIds.length) {
         return res.status(400).json({ error: 'One or more books not found' });
       }
 
-      let preference = await Preference.findOne({ userId: req.user.id });
+      const existing = await Preference.findOne({
+        userId: req.user.id,
+        sessionId: activeSession._id,
+      });
 
-      if (preference) {
+      if (existing) {
         return res.status(409).json({
           error: 'Preferences already submitted and cannot be updated'
         });
-      } else {
-        preference = new Preference({
-          userId: req.user.id,
-          rankedBookIds
-        });
       }
+
+      const preference = new Preference({
+        userId: req.user.id,
+        rankedBookIds,
+        sessionId: activeSession._id,
+      });
 
       await preference.save();
       await preference.populate('rankedBookIds', 'title author isbnOrBookId');
@@ -65,13 +77,25 @@ router.post('/',
   }
 );
 
+// GET /preferences/all — admin: get all preferences (filtered by active session by default)
 router.get('/all', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const preferences = await Preference.find()
+    const filter = {};
+
+    if (req.query.sessionId) {
+      filter.sessionId = req.query.sessionId;
+    } else {
+      const activeSession = await Session.findOne({ status: 'ACTIVE' });
+      if (activeSession) {
+        filter.sessionId = activeSession._id;
+      }
+    }
+
+    const preferences = await Preference.find(filter)
       .populate('userId', 'name email registrationNumber')
       .populate('rankedBookIds', 'title author isbnOrBookId')
       .sort({ submittedAt: -1 });

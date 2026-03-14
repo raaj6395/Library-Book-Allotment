@@ -46,6 +46,11 @@ const userSchema = new mongoose.Schema({
     min: 0,
     max: 10
   },
+  sessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now

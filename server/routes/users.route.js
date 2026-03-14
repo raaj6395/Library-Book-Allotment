@@ -1,6 +1,7 @@
 import express from "express";
 import { body, validationResult } from "express-validator";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { requireActiveSession } from "../middleware/requireActiveSession.js";
 import User from "../models/User.model.js";
 import Student from "../models/Student.model.js";
 import { addEmailToQueue } from "../emailWorker/emailService.js";
@@ -37,6 +38,7 @@ router.post(
   "/",
   authenticate,
   requireAdmin,
+  requireActiveSession,
   [
     body("registration_number")
       .trim()
@@ -51,6 +53,7 @@ router.post(
       }
 
       const { registration_number } = req.body;
+      const activeSession = req.activeSession;
 
       const student = await Student.findOne({
         registrationNumber: registration_number,
@@ -61,20 +64,62 @@ router.post(
           .json({ error: "No student found with this registration number" });
       }
 
-      const existingUser = await User.findOne({
-        registrationNumber: registration_number,
-      });
-      if (existingUser) {
-        return res
-          .status(409)
-          .json({ error: "User already exists for this student" });
-      }
-
       const chars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
       const tempPassword = Array.from(crypto.randomBytes(10))
         .map((b) => chars[b % chars.length])
         .join("");
+
+      const existingUser = await User.findOne({
+        registrationNumber: registration_number,
+      });
+
+      if (existingUser) {
+        // Same session → already created, reject
+        if (existingUser.sessionId?.toString() === activeSession._id.toString()) {
+          return res.status(409).json({
+            error: "User already exists for this student in the current session",
+          });
+        }
+
+        // Different (prior) session → re-activate for new session
+        existingUser.sessionId = activeSession._id;
+        existingUser.password = tempPassword;
+        existingUser.name = student.name;
+        existingUser.email = student.email;
+        existingUser.course = student.course || existingUser.course;
+        existingUser.batch = student.batch || existingUser.batch;
+        existingUser.branch = student.branch || existingUser.branch;
+        existingUser.cpi = student.cpi ?? existingUser.cpi;
+        await existingUser.save();
+
+        const emailBody = `
+<p>Dear ${student.name},</p>
+
+<p>Your account has been re-activated for the <strong>Library Book Allotment System</strong> for the new semester.</p>
+
+<p>
+<strong>Email:</strong> ${student.email}<br>
+<strong>New Temporary Password:</strong> ${tempPassword}
+</p>
+
+<p>Please login with your new credentials.</p>
+`;
+        const html = libraryEmailTemplate({
+          title: "Library System Account Re-activated",
+          body: emailBody,
+        });
+
+        await addEmailToQueue({
+          sendToEmail: student.email,
+          title: "Library System Credentials - Central Library, MNNIT",
+          subject: html,
+        });
+
+        const userResponse = existingUser.toObject();
+        delete userResponse.password;
+        return res.status(200).json({ ...userResponse, tempPassword });
+      }
 
       const user = new User({
         name: student.name,
@@ -86,9 +131,10 @@ router.post(
         batch: student.batch || "",
         branch: student.branch || "",
         cpi: student.cpi,
+        sessionId: activeSession._id,
       });
 
-      const body = `
+      const emailBody = `
 <p>Dear ${student.name},</p>
 
 <p>Your account has been created for the <strong>Library Book Allotment System</strong>.</p>
@@ -103,7 +149,7 @@ router.post(
 
       const html = libraryEmailTemplate({
         title: "Library System Account Created",
-        body,
+        body: emailBody,
       });
 
       await user.save();

@@ -1,23 +1,30 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { Users, BookOpen, Play, LogOut, Upload, GraduationCap } from 'lucide-react';
+import { Users, BookOpen, Play, LogOut, Upload, GraduationCap, CalendarClock, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AddBookForm from '@/components/admin/AddBookForm';
 import AddUserForm from '@/components/admin/AddUserForm';
 import AllotmentSection from '@/components/admin/AllotmentSection';
 import StudentUploadSection from '@/components/admin/StudentUploadSection';
 import BulkBookUpload from '@/components/admin/BulkBookUpload';
+import { SessionBanner } from '@/components/admin/SessionBanner';
+import { SessionSection } from '@/components/admin/SessionSection';
+import TokenSection from '@/components/admin/TokenSection';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleSessionChange = () => {
+    setSessionRefreshKey((k) => k + 1);
   };
 
   return (
@@ -65,13 +72,24 @@ export default function AdminDashboard() {
         </div>
       </header>
 
+      {/* Session Status Banner */}
+      <SessionBanner refreshKey={sessionRefreshKey} />
+
       {/* Main */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 sm:py-8">
 
-        <Tabs defaultValue="books" className="w-full space-y-6">
+        <Tabs defaultValue="session" className="w-full space-y-6">
 
           {/* Tabs */}
-          <TabsList className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 h-auto p-1">
+          <TabsList className="w-full grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 h-auto p-1">
+
+            <TabsTrigger
+              value="session"
+              className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
+            >
+              <CalendarClock className="mr-2 h-4 w-4" />
+              Session
+            </TabsTrigger>
 
             <TabsTrigger
               value="books"
@@ -106,6 +124,14 @@ export default function AdminDashboard() {
             </TabsTrigger>
 
             <TabsTrigger
+              value="tokens"
+              className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
+            >
+              <Ticket className="mr-2 h-4 w-4" />
+              Tokens
+            </TabsTrigger>
+
+            <TabsTrigger
               value="book-upload"
               className="flex items-center justify-center w-full text-xs sm:text-sm py-2"
             >
@@ -117,6 +143,10 @@ export default function AdminDashboard() {
 
           {/* Tab Contents */}
           <div className="w-full">
+
+            <TabsContent value="session" className="mt-4">
+              <SessionSection onSessionChange={handleSessionChange} />
+            </TabsContent>
 
             <TabsContent value="books" className="mt-4">
               <AddBookForm />
@@ -132,6 +162,10 @@ export default function AdminDashboard() {
 
             <TabsContent value="students" className="mt-4">
               <StudentUploadSection />
+            </TabsContent>
+
+            <TabsContent value="tokens" className="mt-4">
+              <TokenSection />
             </TabsContent>
 
             <TabsContent value="book-upload" className="mt-4">

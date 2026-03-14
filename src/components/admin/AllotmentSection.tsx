@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { allotmentAPI } from '@/lib/api';
+import { allotmentAPI, sessionAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Download, Loader2, Play, RefreshCw, RotateCcw, BookCheck, Printer } from 'lucide-react';
+import { Download, Loader2, Play, RefreshCw, Printer } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -34,20 +34,11 @@ export default function AllotmentSection() {
   const [results, setResults] = useState<any>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<any[]>([]);
+  const [activeSession, setActiveSession] = useState<any>(null);
 
   // Allotment run form
   const [course, setCourse] = useState('BTech');
   const [year, setYear] = useState('1st Year');
-  const [semesterType, setSemesterType] = useState('Even');
-  const [semesterYear, setSemesterYear] = useState(new Date().getFullYear());
-
-  // Token reset
-  const [resettingTokens, setResettingTokens] = useState(false);
-  // Book returns
-  const [returnRegNo, setReturnRegNo] = useState('');
-  const [returnData, setReturnData] = useState<any>(null);
-  const [loadingReturn, setLoadingReturn] = useState(false);
-  const [markingReturned, setMarkingReturned] = useState<string | null>(null);
 
   // Allotment slip
   const [slipRegNo, setSlipRegNo] = useState('');
@@ -67,6 +58,19 @@ export default function AllotmentSection() {
     loadEvents();
   }, []);
 
+  useEffect(() => {
+    loadActiveSession();
+  }, []);
+
+  const loadActiveSession = async () => {
+    try {
+      const data = await sessionAPI.getActive();
+      setActiveSession(data.session);
+    } catch (error) {
+      console.error('Error loading active session:', error);
+    }
+  };
+
   const loadEvents = async () => {
     try {
       const data = await allotmentAPI.getEvents();
@@ -77,16 +81,25 @@ export default function AllotmentSection() {
   };
 
   const handleRunAllotment = async () => {
+    if (!activeSession) {
+      toast({
+        title: 'No Active Session',
+        description: 'Please create an active session before running allotment.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (
       !confirm(
-        `Run allotment for ${course} - ${year} (${semesterType} ${semesterYear})?\n\nThis will assign books to eligible students based on CPI ranking.`
+        `Run allotment for ${course} - ${year} (${activeSession.semesterType === 'ODD' ? 'Odd' : 'Even'} ${activeSession.year})?\n\nThis will assign books to eligible students based on CPI ranking.`
       )
     )
       return;
 
     setLoading(true);
     try {
-      const data = await allotmentAPI.runAllotment({ course, year, semesterType, semesterYear });
+      const data = await sessionAPI.runAllotment({ course, year });
       setResults(data);
       setSelectedEventId(data.eventId);
       await loadEvents();
@@ -132,63 +145,6 @@ export default function AllotmentSection() {
     }
   };
 
-  const handleDownloadNonReturned = async () => {
-    setDownloading(true);
-    try {
-      await allotmentAPI.downloadNonReturnedReport();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to download', variant: 'destructive' });
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleResetTokens = async () => {
-    if (!confirm(`Reset token counters for ${semesterType} ${semesterYear}? This will restart serial numbers from 01.`)) return;
-    setResettingTokens(true);
-    try {
-      await allotmentAPI.resetTokens(semesterType, semesterYear);
-      toast({ title: 'Done', description: `Token counters reset for ${semesterType} ${semesterYear}` });
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to reset tokens', variant: 'destructive' });
-    } finally {
-      setResettingTokens(false);
-    }
-  };
-
-  // Book returns
-  const handleLookupReturn = async () => {
-    if (!returnRegNo.trim()) return;
-    setLoadingReturn(true);
-    setReturnData(null);
-    try {
-      const data = await allotmentAPI.getReturns(returnRegNo.trim());
-      setReturnData(data);
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Student not found', variant: 'destructive' });
-    } finally {
-      setLoadingReturn(false);
-    }
-  };
-
-  const handleMarkReturned = async (allotmentId: string) => {
-    setMarkingReturned(allotmentId);
-    try {
-      await allotmentAPI.markReturned(allotmentId);
-      setReturnData((prev: any) => ({
-        ...prev,
-        allotments: prev.allotments.map((a: any) =>
-          a._id === allotmentId ? { ...a, returned: true, returnedAt: new Date().toISOString() } : a
-        ),
-      }));
-      toast({ title: 'Returned', description: 'Book marked as returned and copies updated.' });
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to mark returned', variant: 'destructive' });
-    } finally {
-      setMarkingReturned(null);
-    }
-  };
-
   // Allotment slip
   const handleLookupSlip = async () => {
     if (!slipRegNo.trim()) return;
@@ -220,65 +176,48 @@ export default function AllotmentSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <Label>Course</Label>
-              <select
-                value={course}
-                onChange={(e) => setCourse(e.target.value)}
-                className="w-full border rounded px-2 py-2 text-sm bg-background"
-              >
-                {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+          {!activeSession ? (
+            <div className="text-center py-4 text-muted-foreground">
+              No active session. Please create a session in the Session tab first.
             </div>
-            <div className="space-y-1">
-              <Label>Year</Label>
-              <select
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                className="w-full border rounded px-2 py-2 text-sm bg-background"
-              >
-                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label>Semester</Label>
-              <select
-                value={semesterType}
-                onChange={(e) => setSemesterType(e.target.value)}
-                className="w-full border rounded px-2 py-2 text-sm bg-background"
-              >
-                {SEMESTER_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label>Year (AD)</Label>
-              <Input
-                type="number"
-                value={semesterYear}
-                onChange={(e) => setSemesterYear(Number(e.target.value))}
-                min={2020}
-                max={2099}
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={handleRunAllotment} disabled={loading} size="lg">
-              {loading ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
-              ) : (
-                <><Play className="mr-2 h-4 w-4" />Run Allotment</>
-              )}
-            </Button>
-            <Button variant="outline" onClick={handleResetTokens} disabled={resettingTokens}>
-              {resettingTokens ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
-              Reset Token Counters
-            </Button>
-<Button variant="outline" onClick={handleDownloadNonReturned} disabled={downloading}>
-              {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Export Non-Returned Books
-            </Button>
-          </div>
+          ) : (
+            <>
+              <div className="text-sm text-muted-foreground mb-2">
+                Current Active Session: {activeSession.semesterType === 'ODD' ? 'Odd' : 'Even'} {activeSession.year}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Course</Label>
+                  <select
+                    value={course}
+                    onChange={(e) => setCourse(e.target.value)}
+                    className="w-full border rounded px-2 py-2 text-sm bg-background"
+                  >
+                    {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Year</Label>
+                  <select
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    className="w-full border rounded px-2 py-2 text-sm bg-background"
+                  >
+                    {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleRunAllotment} disabled={loading} size="lg">
+                  {loading ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
+                  ) : (
+                    <><Play className="mr-2 h-4 w-4" />Run Allotment</>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -373,78 +312,6 @@ export default function AllotmentSection() {
           </CardContent>
         </Card>
       )}
-
-      {/* Book Returns */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><BookCheck className="h-5 w-5" /> Book Returns</CardTitle>
-          <CardDescription>Enter a student's registration number to view and mark books as returned</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Registration Number (e.g. 21114XXX)"
-              value={returnRegNo}
-              onChange={(e) => setReturnRegNo(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLookupReturn()}
-              className="max-w-xs"
-            />
-            <Button onClick={handleLookupReturn} disabled={loadingReturn}>
-              {loadingReturn ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Lookup'}
-            </Button>
-          </div>
-          {returnData && (
-            <div className="space-y-3">
-              <div className="p-3 bg-muted rounded-lg text-sm">
-                <strong>{returnData.student.name}</strong> &nbsp;·&nbsp; {returnData.student.registrationNumber} &nbsp;·&nbsp; {returnData.student.branch} &nbsp;·&nbsp; {returnData.student.batch} &nbsp;·&nbsp; {returnData.student.course}
-              </div>
-              {returnData.allotments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No allotted books found for this student.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-1 pr-2">Token</th>
-                      <th className="text-left py-1 pr-2">Book Title</th>
-                      <th className="text-left py-1 pr-2">Class No.</th>
-                      <th className="text-left py-1 pr-2">Status</th>
-                      <th className="text-right py-1">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {returnData.allotments.map((a: any) => (
-                      <tr key={a._id} className={`border-t ${a.returned ? 'opacity-60' : ''}`}>
-                        <td className="py-2 pr-2 font-mono text-xs">{a.tokenNumber || '-'}</td>
-                        <td className="py-2 pr-2">{a.book?.title || '-'}</td>
-                        <td className="py-2 pr-2 text-muted-foreground">{a.book?.classNo || '-'}</td>
-                        <td className="py-2 pr-2">
-                          {a.returned ? (
-                            <span className="text-green-600 font-medium">✓ Returned</span>
-                          ) : (
-                            <span className="text-yellow-600">Pending</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-right">
-                          {!a.returned && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleMarkReturned(a._id)}
-                              disabled={markingReturned === a._id}
-                            >
-                              {markingReturned === a._id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Mark Returned'}
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Allotment Slip */}
       <Card className="print:shadow-none">

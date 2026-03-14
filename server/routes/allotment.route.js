@@ -1,37 +1,17 @@
 import express from 'express';
 import ExcelJS from 'exceljs';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import Preference from '../models/Preference.model.js';
-import Book from '../models/Book.model.js';
 import Allotment from '../models/Allotment.model.js';
 import AllotmentEvent from '../models/AllotmentEvent.model.js';
 import AllotmentMeta from '../models/AllotmentMeta.model.js';
+import Book from '../models/Book.model.js';
+import Session from '../models/Session.model.js';
 import User from '../models/User.model.js';
-import { addEmailToQueue } from '../emailWorker/emailService.js';
-import { libraryEmailTemplate } from "../utils/emailTemplates.js";
+import { executeAllotment } from '../utils/allotmentLogic.js';
 
 const router = express.Router();
 
-const MAX_BOOKS_PER_STUDENT = 5;
-
-// Build semester key like "Even-2026"
-function getSemesterKey(semesterType, semesterYear) {
-  return `${semesterType}-${semesterYear}`;
-}
-
-// Generate token number for a student
-// BTech: {E|O}/{YEAR}/{SERIAL}  e.g. E/2026/01
-// MCA:   MCA/{E|O}/{YEAR}/{SERIAL}  e.g. MCA/E/2026/01
-function buildTokenNumber(course, semesterType, semesterYear, serial) {
-  const typeChar = semesterType === 'Even' ? 'E' : 'O';
-  const serialStr = String(serial).padStart(2, '0');
-  if (course === 'MCA') {
-    return `MCA/${typeChar}/${semesterYear}/${serialStr}`;
-  }
-  return `${typeChar}/${semesterYear}/${serialStr}`;
-}
-
-// POST /allotment/run
+// POST /allotment/run — backward-compatible route (no session required)
 router.post('/run', authenticate, requireAdmin, async (req, res) => {
   try {
     const {
@@ -51,177 +31,25 @@ router.post('/run', authenticate, requireAdmin, async (req, res) => {
       year,
       semesterType,
       semesterYear,
+      sessionId: null,
     });
     await event.save();
 
-    // Fetch preferences only for students matching the selected course+year
-    // User.course should be 'BTech' or 'MCA'; User.batch encodes the year (e.g. '2nd Year')
-    const matchingUsers = await User.find({ course, batch: year, role: 'user' }).select('_id');
-    const matchingUserIds = matchingUsers.map(u => u._id);
-
-    const preferences = await Preference.find({ userId: { $in: matchingUserIds } })
-      .populate('userId')
-      .populate('rankedBookIds')
-      .sort({ submittedAt: 1 });
-
-    const allBooks = await Book.find();
-    const bookAvailability = {};
-    allBooks.forEach(book => {
-      bookAvailability[book._id.toString()] = book.availableCopies;
+    const { totalAllocations, results } = await executeAllotment({
+      event,
+      course,
+      year,
+      semesterType,
+      semesterYear,
+      sessionId: null,
     });
-
-    const validPreferences = preferences.filter(pref => pref.userId != null);
-
-    // Sort by CPI descending, then by submission timestamp ascending (FCFS tiebreaker)
-    const scoredPrefs = [...validPreferences].sort((a, b) => {
-      const cpiA = a.userId?.cpi ?? 0;
-      const cpiB = b.userId?.cpi ?? 0;
-      if (cpiB !== cpiA) return cpiB - cpiA;
-      return new Date(a.submittedAt) - new Date(b.submittedAt);
-    });
-
-    const allottedPerUser = {};
-    scoredPrefs.forEach(pref => {
-      allottedPerUser[pref.userId._id.toString()] = new Set();
-    });
-
-    const allAllocations = [];
-
-    // Allocation rounds: each round, each student (in CPI desc order) gets next available preferred book
-    const ROUNDS = MAX_BOOKS_PER_STUDENT;
-    for (let round = 0; round < ROUNDS; round++) {
-      for (const pref of scoredPrefs) {
-        const userId = pref.userId._id.toString();
-        const userAllotted = allottedPerUser[userId];
-
-        if (userAllotted.size >= MAX_BOOKS_PER_STUDENT) continue;
-
-        for (const book of pref.rankedBookIds) {
-          if (book == null) continue;
-          const bookId = book._id.toString();
-
-          if (!(bookAvailability[bookId] > 0)) continue;
-          if (userAllotted.has(bookId)) continue;
-
-          const allocation = new Allotment({
-            eventId: event._id,
-            userId: pref.userId._id,
-            bookId: book._id,
-            status: 'allotted',
-          });
-          await allocation.save();
-          allAllocations.push(allocation);
-
-          bookAvailability[bookId]--;
-          await Book.findByIdAndUpdate(book._id, { $inc: { availableCopies: -1 } });
-
-          userAllotted.add(bookId);
-          break;
-        }
-      }
-    }
-
-    // Assign token numbers
-    const semKey = getSemesterKey(semesterType, semesterYear);
-    let meta = await AllotmentMeta.findOne({ semesterKey: semKey });
-    if (!meta) {
-      meta = new AllotmentMeta({ semesterKey: semKey, btechSerial: 0, mcaSerial: 0 });
-    }
-
-    // Group users who got at least one book — assign one token per user
-    const usersWithBooks = {};
-    for (const pref of scoredPrefs) {
-      const uid = pref.userId._id.toString();
-      if (allottedPerUser[uid].size > 0) {
-        usersWithBooks[uid] = pref.userId;
-      }
-    }
-
-    // Assign tokens in the order they were processed (CPI desc)
-    const tokenMap = {}; // userId -> tokenNumber
-    for (const pref of scoredPrefs) {
-      const uid = pref.userId._id.toString();
-      if (!usersWithBooks[uid]) continue;
-
-      let serial;
-      if (course === 'MCA') {
-        meta.mcaSerial += 1;
-        serial = meta.mcaSerial;
-      } else {
-        meta.btechSerial += 1;
-        serial = meta.btechSerial;
-      }
-      tokenMap[uid] = buildTokenNumber(course, semesterType, semesterYear, serial);
-    }
-    await meta.save();
-
-    // Update allotment records with token numbers
-    for (const [userId, token] of Object.entries(tokenMap)) {
-      await Allotment.updateMany(
-        { eventId: event._id, userId },
-        { $set: { tokenNumber: token } }
-      );
-    }
-
-    // Send emails with all preferences listed
-    for (const pref of scoredPrefs) {
-      const user = pref.userId;
-      const userId = user._id.toString();
-      const userAllotted = allottedPerUser[userId];
-      const tokenNumber = tokenMap[userId] || '';
-
-      const preferenceList = pref.rankedBookIds
-        .filter(b => b != null)
-        .map((b, i) => {
-          const allotted = userAllotted.has(b._id.toString());
-          const mark = allotted ? '✅ ALLOTTED' : '❌ NOT ALLOTTED';
-          return `<li>${i + 1}. <strong>${b.title}</strong> by ${b.author || 'Unknown'} &mdash; ${mark}</li>`;
-        })
-        .join('');
-
-      let emailBody;
-      if (userAllotted.size === 0) {
-        emailBody = `
-          <p>Dear ${user.name},</p>
-          <p>We regret to inform you that no books could be allotted to you in this allotment round.</p>
-          <p>Your preferences were:</p>
-          <ol>${preferenceList}</ol>
-          <p>Please contact the library administration for further assistance.</p>
-        `;
-      } else {
-        emailBody = `
-          <p>Dear ${user.name},</p>
-          <p>Your book allotment results for ${semesterType} Semester ${semesterYear}:</p>
-          <p><strong>Token Number: ${tokenNumber}</strong></p>
-          <p>Your Preferences:</p>
-          <ol>${preferenceList}</ol>
-          <p>Please collect your allotted books from the library with your token number.</p>
-        `;
-      }
-
-      const html = libraryEmailTemplate({
-        title: "Library Book Allotment Result",
-        body: emailBody,
-      });
-
-      await addEmailToQueue({
-        sendToEmail: user.email,
-        title: "Library Book Allotment Result - Central Library, MNNIT",
-        subject: html,
-      });
-    }
-
-    const results = await Allotment.find({ eventId: event._id })
-      .populate('userId', 'name email registrationNumber course batch branch cpi')
-      .populate('bookId', 'title author isbnOrBookId classNo')
-      .sort({ createdAt: 1 });
 
     res.json({
       eventId: event._id,
       runAt: event.runAt,
       course,
       year,
-      totalAllocations: allAllocations.length,
+      totalAllocations,
       totalWaitlists: 0,
       results,
     });
@@ -238,7 +66,7 @@ router.post('/reset-tokens', authenticate, requireAdmin, async (req, res) => {
       semesterType = 'Even',
       semesterYear = new Date().getFullYear(),
     } = req.body;
-    const semKey = getSemesterKey(semesterType, semesterYear);
+    const semKey = `${semesterType}-${semesterYear}`;
     await AllotmentMeta.findOneAndUpdate(
       { semesterKey: semKey },
       { $set: { btechSerial: 0, mcaSerial: 0 } },
@@ -306,22 +134,16 @@ router.get('/report/:eventId', authenticate, requireAdmin, async (req, res) => {
       .populate('userId', 'name registrationNumber course batch branch cpi')
       .populate('bookId', 'title author classNo isbnOrBookId');
 
-    // Group by user
     const byUser = {};
     for (const a of allotments) {
       if (!a.userId || !a.bookId) continue;
       const uid = a.userId._id.toString();
       if (!byUser[uid]) {
-        byUser[uid] = {
-          user: a.userId,
-          tokenNumber: a.tokenNumber,
-          books: [],
-        };
+        byUser[uid] = { user: a.userId, tokenNumber: a.tokenNumber, books: [] };
       }
       byUser[uid].books.push(a.bookId);
     }
 
-    // Sort by branch asc then batch/year asc
     const rows = Object.values(byUser).sort((a, b) => {
       const branchCmp = (a.user.branch || '').localeCompare(b.user.branch || '');
       if (branchCmp !== 0) return branchCmp;
@@ -383,7 +205,6 @@ router.get('/results/:eventId', authenticate, requireAdmin, async (req, res) => 
       .populate('bookId', 'title author isbnOrBookId classNo')
       .sort({ createdAt: 1 });
 
-    // Sort by branch asc, then batch/year asc
     results.sort((a, b) => {
       const branchCmp = (a.userId?.branch || '').localeCompare(b.userId?.branch || '');
       if (branchCmp !== 0) return branchCmp;
@@ -402,6 +223,7 @@ router.get('/events', authenticate, requireAdmin, async (_req, res) => {
   try {
     const events = await AllotmentEvent.find()
       .populate('runByAdminId', 'name email')
+      .populate('sessionId', 'year semesterType status')
       .sort({ runAt: -1 });
     res.json(events);
   } catch (error) {
@@ -410,17 +232,31 @@ router.get('/events', authenticate, requireAdmin, async (_req, res) => {
   }
 });
 
-// GET /allotment/my-allocation
+// GET /allotment/my-allocation — session-aware: show allocations for the active session
 router.get('/my-allocation', authenticate, async (req, res) => {
   try {
-    const latestEvent = await AllotmentEvent.findOne().sort({ runAt: -1 });
-    if (!latestEvent) return res.json([]);
+    const activeSession = await Session.findOne({ status: 'ACTIVE' });
 
-    const allocations = await Allotment.find({
-      eventId: latestEvent._id,
-      userId: req.user.id,
-      status: 'allotted',
-    }).populate('bookId', 'title author isbnOrBookId category classNo');
+    const allotmentFilter = { userId: req.user.id, status: 'allotted' };
+
+    if (activeSession) {
+      // Find events linked to the active session
+      const sessionEvents = await AllotmentEvent.find({ sessionId: activeSession._id }).select('_id');
+      if (sessionEvents.length > 0) {
+        allotmentFilter.eventId = { $in: sessionEvents.map(e => e._id) };
+      } else {
+        // No events yet for this session — return empty
+        return res.json([]);
+      }
+    } else {
+      // No active session: fall back to the globally latest event
+      const latestEvent = await AllotmentEvent.findOne().sort({ runAt: -1 });
+      if (!latestEvent) return res.json([]);
+      allotmentFilter.eventId = latestEvent._id;
+    }
+
+    const allocations = await Allotment.find(allotmentFilter)
+      .populate('bookId', 'title author isbnOrBookId category classNo');
 
     res.json(allocations);
   } catch (error) {
@@ -478,7 +314,6 @@ router.post('/return/:allotmentId', authenticate, requireAdmin, async (req, res)
     allotment.returnedAt = new Date();
     await allotment.save();
 
-    // Increment available copies
     await Book.findByIdAndUpdate(allotment.bookId, { $inc: { availableCopies: 1 } });
 
     res.json({ message: 'Book marked as returned', allotment });
