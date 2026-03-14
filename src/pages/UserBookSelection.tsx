@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { booksAPI, preferencesAPI, allotmentAPI } from '@/lib/api';
+import { booksAPI, preferencesAPI, allotmentAPI, sessionAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +43,7 @@ export default function UserBookSelection() {
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
   const [myPreferences, setMyPreferences] = useState<any>(null);
   const [myAllocation, setMyAllocation] = useState<any>(null);
+  const [activeSession, setActiveSession] = useState<any>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   //for search bar
@@ -69,7 +70,7 @@ export default function UserBookSelection() {
   const loadData = async () => {
     try {
       setTableLoading(true);
-      const [booksRes, preferencesData, allocationData] = await Promise.all([
+      const [booksRes, preferencesData, allocationData, sessionData] = await Promise.all([
         booksAPI.getAll({
           search: debouncedSearch,
           page: currentPage,
@@ -77,7 +78,9 @@ export default function UserBookSelection() {
         }),
         preferencesAPI.getMyPreferences().catch(() => null),
         allotmentAPI.getMyAllocation().catch(() => null),
+        sessionAPI.getActive().catch(() => ({ session: null })),
       ]);
+      setActiveSession(sessionData.session);
 
       setBooks(booksRes.items || []);
       setSelectedBookMap(prev => {
@@ -267,6 +270,28 @@ export default function UserBookSelection() {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
+        {/* Session Info Card */}
+        {activeSession ? (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="py-3">
+              <p className="text-sm text-blue-700">
+                Current Semester:{' '}
+                <strong>
+                  {activeSession.semesterType} {activeSession.year}
+                </strong>
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="py-3">
+              <p className="text-sm text-yellow-700">
+                No active allotment session. Preference submission is currently closed.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {myAllocation?.length > 0 && (
           <Card className="border-green-200 bg-green-50">
             <CardHeader>
@@ -428,7 +453,7 @@ export default function UserBookSelection() {
 
               <Button
                 onClick={handleSubmitPreferences}
-                disabled={submitting || selectedBooks.length === 0}
+                disabled={submitting || selectedBooks.length === 0 || !activeSession}
                 size="lg"
                 className="w-full"
               >

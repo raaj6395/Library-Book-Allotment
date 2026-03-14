@@ -26,6 +26,11 @@ const allotmentEventSchema = new mongoose.Schema({
   semesterYear: {
     type: Number,
     default: () => new Date().getFullYear()
+  },
+  sessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    default: null,
   }
 });
 

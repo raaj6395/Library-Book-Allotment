@@ -228,6 +228,28 @@ export const bookUploadAPI = {
   },
 };
 
+export const sessionAPI = {
+  getActive: (): Promise<{ session: { _id: string; year: number; semesterType: 'ODD' | 'EVEN'; status: 'ACTIVE' | 'COMPLETED'; createdAt: string; endedAt?: string } | null }> =>
+    apiRequest('/admin/session/active'),
+
+  create: (payload: { year: number; semesterType: 'ODD' | 'EVEN' }) =>
+    apiRequest('/admin/session', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  end: () =>
+    apiRequest('/admin/session/end', { method: 'POST' }),
+
+  getHistory: () => apiRequest('/admin/session/history'),
+
+  runAllotment: (payload: { course: string; year: string }) =>
+    apiRequest('/admin/session/run-allotment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+};
+
 export const adminBooksAPI = {
   list: async (
     opts: { search?: string; page?: number; limit?: number } = {},

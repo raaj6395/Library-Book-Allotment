@@ -20,9 +20,14 @@ const preferenceSchema = new mongoose.Schema({
   submittedAt: {
     type: Date,
     default: Date.now
+  },
+  sessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    default: null,
   }
 });
 
-preferenceSchema.index({ userId: 1 }, { unique: true });
+preferenceSchema.index({ userId: 1, sessionId: 1 }, { unique: true });
 
 export default mongoose.model('Preference', preferenceSchema);
